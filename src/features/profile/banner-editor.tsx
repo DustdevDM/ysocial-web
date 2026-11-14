@@ -1,4 +1,5 @@
 import { LiveCropperImage } from "./live-cropper-image";
+import { GifGrid } from "./gif-grid";
 import * as Cropper from "@zriz/react/cropper";
 import { useZoom, type Cropper as CropperApi } from "@zriz/react";
 import "@zriz/react/styles.css";
@@ -326,39 +327,23 @@ function BannerPicker({
               </Button>
             </form>
             <div
-              className="max-h-80 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain"
+              className="max-h-80 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain [overflow-anchor:none]"
               aria-label="GIF results"
               ref={scrollRoot}
               aria-busy={loading}
             >
-              <div className="columns-2 gap-2 sm:columns-3">
-                {results?.items.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    aria-label={item.title}
-                    aria-pressed={selectedGif === item.token}
-                    disabled={busy}
-                    onClick={() => {
-                      setReady(false);
-                      setSelectedGif(item.token);
-                      setFile(null);
-                      setPreview(item.url);
-                      setError("");
-                    }}
-                    className="mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg border-2 border-transparent outline-none aria-pressed:border-primary focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <img
-                      src={item.previewUrl}
-                      width={item.width ?? 220}
-                      height={item.height ?? 165}
-                      alt={item.title}
-                      loading="lazy"
-                      className="h-auto w-full"
-                    />
-                  </button>
-                ))}
-              </div>
+              <GifGrid
+                items={results?.items ?? []}
+                scrollRoot={scrollRoot}
+                disabled={busy}
+                onSelect={(item) => {
+                  setReady(false);
+                  setSelectedGif(item.token);
+                  setFile(null);
+                  setPreview(item.url);
+                  setError("");
+                }}
+              />
               <div ref={sentinel} className="h-px" aria-hidden="true" />
               {loading && results && (
                 <p
