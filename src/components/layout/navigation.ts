@@ -1,4 +1,4 @@
-import { House, Mail, Search, SlidersHorizontal, Users } from "lucide-react";
+import { House, Mail, Search, Users } from "lucide-react";
 
 export const navigation = [
   { label: "Feed", icon: House, to: "/" },

@@ -97,6 +97,8 @@ function AppShell() {
             />
             <Route path="/messages" element={<ComingSoon title="Messages" />} />
             <Route path="/search" element={<ComingSoon title="Search" />} />
+            <Route path="/privacy" element={<ComingSoon title="Privacy" />} />
+            <Route path="/terms" element={<ComingSoon title="Terms" />} />
             <Route
               path="/settings/feed"
               element={<ComingSoon title="Feed preferences" />}

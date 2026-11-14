@@ -1,4 +1,5 @@
 import { Link, NavLink } from "react-router";
+import { CodeXml, FileText, Shield } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -10,7 +11,7 @@ export function NavigationSidebar() {
   return (
     <aside
       aria-label="Sidebar"
-      className="min-h-0 min-w-0 overflow-hidden p-2 lg:p-3"
+      className="flex min-h-0 min-w-0 flex-col overflow-y-auto p-2 lg:p-3"
     >
       <div className="flex flex-col items-start gap-4">
         <Link
@@ -89,6 +90,37 @@ export function NavigationSidebar() {
           ))}
         </nav>
       </div>
+      <nav
+        aria-label="Legal and project links"
+        className="mt-auto flex shrink-0 flex-col items-start gap-2 px-3 pt-6 pb-1 text-xs text-muted-foreground lg:flex-row lg:flex-wrap lg:gap-x-3"
+      >
+        {[
+          { label: "Privacy", to: "/privacy", icon: Shield },
+          { label: "Terms", to: "/terms", icon: FileText },
+          {
+            label: "Open Source",
+            to: "https://git.ysocial.cc/",
+            icon: CodeXml,
+          },
+        ].map(({ label, to, icon: Icon }) => (
+          <Tooltip key={to}>
+            <TooltipTrigger
+              render={
+                <Link
+                  to={to}
+                  className="rounded-sm outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Icon aria-hidden="true" className="size-4 lg:hidden" />
+                  <span className="sr-only lg:not-sr-only">{label}</span>
+                </Link>
+              }
+            />
+            <TooltipContent side="right" className="lg:hidden">
+              {label}
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </nav>
     </aside>
   );
 }
