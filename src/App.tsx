@@ -26,6 +26,7 @@ import { useFeed } from "@/features/feed/use-feed";
 import { ProfileSkeleton } from "@/components/loading-skeletons";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { cn } from "@/lib/utils";
+import { SettingsPage } from "@/features/settings/settings";
 
 export function App() {
   return (
@@ -87,6 +88,7 @@ function AppShell() {
               }
             />
             <Route path="/profile" element={<MyProfileRoute auth={auth} />} />
+            <Route path="/asettings" element={<SettingsPage auth={auth} />} />
             <Route
               path="/onboarding"
               element={<OnboardingRoute session={auth.session} />}

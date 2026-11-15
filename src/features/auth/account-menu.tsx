@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import {
-  LogIn,
-  LogOut,
-  RotateCcw,
-  SlidersHorizontal,
-  UserRound,
-} from "lucide-react";
+import { LogIn, LogOut, RotateCcw, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
@@ -98,10 +92,6 @@ export function AccountMenu({ auth }: { auth: AuthState }) {
                 Login
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem render={<Link to="/settings/feed" />}>
-              <SlidersHorizontal />
-              Preferences
-            </DropdownMenuItem>
             {auth.error && (
               <DropdownMenuItem onClick={() => void auth.reload()}>
                 <RotateCcw />

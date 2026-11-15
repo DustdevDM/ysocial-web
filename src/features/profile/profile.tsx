@@ -44,7 +44,7 @@ import {
   mutateFollow,
   projectRelationship,
   rememberProfile,
-  updateAuthorAvatar,
+  updateAuthor,
 } from "@/features/feed/optimistic-actions";
 
 export function ProfilePage({
@@ -257,7 +257,9 @@ export function ProfilePage({
                             }
                           : current,
                       );
-                      updateAuthorAvatar(profile.profile.id, result.avatarUrl);
+                      updateAuthor(profile.profile.id, {
+                        avatarUrl: result.avatarUrl,
+                      });
                       onAvatarSaved(profile.profile.id, result.avatarUrl);
                       setPictureDialogOpen(false);
                     }}

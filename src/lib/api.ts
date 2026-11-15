@@ -150,6 +150,8 @@ export function errorMessage(error: unknown) {
       return "The 15-minute edit window has expired.";
     if (error.message === "profile_not_found")
       return "This profile does not exist.";
+    if (error.message === "invalid_profile")
+      return "Check your handle, display name, and bio, then try again.";
     if (error.message === "gif_search_limit")
       return "GIF search limit reached. Try again later.";
     if (error.message === "gif_search_unavailable")
@@ -247,6 +249,23 @@ function request<T>(
 }
 const postPath = (id: string) => `/api/posts/${encodeURIComponent(id)}`;
 export const api = {
+  updateProfile: (
+    profile: Partial<
+      Pick<Profile["profile"], "handle" | "displayName" | "bio">
+    >,
+    signal?: AbortSignal,
+  ) =>
+    request(
+      "/api/profiles/me",
+      z.object({
+        handle: z.string(),
+        displayName: z.string(),
+        bio: z.string(),
+      }),
+      "PATCH",
+      profile,
+      signal,
+    ),
   session: (signal?: AbortSignal) =>
     request("/auth/me", sessionSchema, "GET", undefined, signal),
   onboard: (handle: string) =>
