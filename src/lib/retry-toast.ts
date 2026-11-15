@@ -1,4 +1,4 @@
-import { toast } from "@/components/ui/toast";
+import { toast } from "@/components/ui/toast-manager";
 import { errorMessage } from "@/lib/api";
 
 export function showRetryToast(

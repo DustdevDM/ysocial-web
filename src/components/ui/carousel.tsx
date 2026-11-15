@@ -12,12 +12,13 @@ type UseCarouselParameters = Parameters<typeof useEmblaCarousel>
 type CarouselOptions = UseCarouselParameters[0]
 type CarouselPlugin = UseCarouselParameters[1]
 
-type CarouselProps = {
+type CarouselControllerOptions = {
   opts?: CarouselOptions
   plugins?: CarouselPlugin
   orientation?: "horizontal" | "vertical"
-  setApi?: (api: CarouselApi) => void
 }
+
+type CarouselController = ReturnType<typeof useCarouselController>
 
 type CarouselContextProps = {
   carouselRef: ReturnType<typeof useEmblaCarousel>[0]
@@ -26,7 +27,7 @@ type CarouselContextProps = {
   scrollNext: () => void
   canScrollPrev: boolean
   canScrollNext: boolean
-} & CarouselProps
+} & Pick<CarouselController, "opts" | "orientation">
 
 const CarouselContext = React.createContext<CarouselContextProps | null>(null)
 
@@ -40,15 +41,13 @@ function useCarousel() {
   return context
 }
 
-function Carousel({
+// Call in the owner: const controller = useCarouselController(options).
+// Read controller.api there and pass controller to <Carousel controller={controller}>.
+function useCarouselController({
   orientation = "horizontal",
   opts,
-  setApi,
   plugins,
-  className,
-  children,
-  ...props
-}: React.ComponentProps<"div"> & CarouselProps) {
+}: CarouselControllerOptions = {}) {
   const [carouselRef, api] = useEmblaCarousel(
     {
       ...opts,
@@ -56,6 +55,17 @@ function Carousel({
     },
     plugins
   )
+
+  return { carouselRef, api, opts, orientation }
+}
+
+function Carousel({
+  controller,
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"div"> & { controller: CarouselController }) {
+  const { carouselRef, api, opts, orientation } = controller
   const subscribe = React.useCallback(
     (onChange: () => void) => {
       if (!api) return () => {}
@@ -100,25 +110,32 @@ function Carousel({
     [scrollPrev, scrollNext]
   )
 
-  React.useEffect(() => {
-    if (!api || !setApi) return
-    setApi(api)
-  }, [api, setApi])
+  const contextValue = React.useMemo(
+    () => ({
+      carouselRef,
+      api,
+      opts,
+      orientation:
+        orientation || (opts?.axis === "y" ? "vertical" : "horizontal"),
+      scrollPrev,
+      scrollNext,
+      canScrollPrev,
+      canScrollNext,
+    }),
+    [
+      carouselRef,
+      api,
+      opts,
+      orientation,
+      scrollPrev,
+      scrollNext,
+      canScrollPrev,
+      canScrollNext,
+    ]
+  )
 
   return (
-    <CarouselContext.Provider
-      value={{
-        carouselRef,
-        api: api,
-        opts,
-        orientation:
-          orientation || (opts?.axis === "y" ? "vertical" : "horizontal"),
-        scrollPrev,
-        scrollNext,
-        canScrollPrev,
-        canScrollNext,
-      }}
-    >
+    <CarouselContext.Provider value={contextValue}>
       <div
         onKeyDownCapture={handleKeyDown}
         className={cn("relative", className)}
@@ -234,10 +251,12 @@ function CarouselNext({
 
 export {
   type CarouselApi,
+  type CarouselController,
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselPrevious,
   CarouselNext,
   useCarousel,
+  useCarouselController,
 }

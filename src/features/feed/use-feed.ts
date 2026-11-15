@@ -14,7 +14,7 @@ import {
   rememberPosts,
   subscribeToActions,
 } from "./optimistic-actions";
-import { toast } from "@/components/ui/toast";
+import { toast } from "@/components/ui/toast-manager";
 
 export function useFeed(
   session: Session | null,

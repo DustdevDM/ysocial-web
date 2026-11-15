@@ -61,6 +61,10 @@ export function BannerEditor({
   );
 }
 
+type BannerSelection =
+  | { kind: "upload"; file: Blob; id: number }
+  | { kind: "gif"; url: string; token: string };
+
 function BannerPicker({
   current,
   onSaved,
@@ -70,13 +74,14 @@ function BannerPicker({
   onSaved: (url: string | null, crop: BannerCrop | null) => void;
   verifyAccount: (signal?: AbortSignal) => Promise<void>;
 }) {
-  const [file, setFile] = useState<Blob | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [selection, setSelection] = useState<BannerSelection | null>(null);
+  const file = selection?.kind === "upload" ? selection.file : null;
+  const preview = selection?.kind === "gif" ? selection.url : file;
+  const selectedGif = selection?.kind === "gif" ? selection.token : "";
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [selectedGif, setSelectedGif] = useState("");
   const [query, setQuery] = useState("cat");
   const [results, setResults] = useState<Awaited<
     ReturnType<typeof api.searchGifs>
@@ -91,12 +96,6 @@ function BannerPicker({
   const input = useRef<HTMLInputElement>(null);
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => request.current?.abort(), []);
-  useEffect(
-    () => () => {
-      if (preview) URL.revokeObjectURL(preview);
-    },
-    [preview],
-  );
   function choose(file: Blob | undefined) {
     if (!file) return;
     setError("");
@@ -114,8 +113,11 @@ function BannerPicker({
       return;
     }
     setReady(false);
-    setFile(file);
-    setPreview(URL.createObjectURL(file));
+    setSelection((previous) => ({
+      kind: "upload",
+      file,
+      id: previous?.kind === "upload" ? previous.id + 1 : 0,
+    }));
   }
   const search = useCallback(
     async (pageNumber = 1) => {
@@ -241,9 +243,7 @@ function BannerPicker({
             if (!busy) {
               request.current?.abort();
               setLoading(false);
-              setFile(null);
-              setPreview(null);
-              setSelectedGif("");
+              setSelection(null);
               setError("");
               if (value === "gifs" && !results) void search();
             }
@@ -267,7 +267,6 @@ function BannerPicker({
                 event.currentTarget.value = "";
               }}
               onChange={(event) => {
-                setSelectedGif("");
                 choose(event.target.files?.[0]);
               }}
             />
@@ -338,9 +337,11 @@ function BannerPicker({
                 disabled={busy}
                 onSelect={(item) => {
                   setReady(false);
-                  setSelectedGif(item.token);
-                  setFile(null);
-                  setPreview(item.url);
+                  setSelection({
+                    kind: "gif",
+                    token: item.token,
+                    url: item.url,
+                  });
                   setError("");
                 }}
               />
@@ -402,9 +403,7 @@ function BannerPicker({
               size="sm"
               disabled={busy}
               onClick={() => {
-                setPreview(null);
-                setFile(null);
-                setSelectedGif("");
+                setSelection(null);
                 setReady(false);
               }}
             >
@@ -412,8 +411,8 @@ function BannerPicker({
             </Button>
           </div>
           <Cropper.Root
-            key={preview}
-            src={file ?? preview}
+            key={selection?.kind === "upload" ? selection.id : selection?.url}
+            src={preview}
             actionsRef={cropper}
             aspect={3}
             maxZoom={5}

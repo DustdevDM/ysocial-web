@@ -4,9 +4,15 @@ import { cssMatrix, viewOf, type ViewFrame } from "@zriz/core/dom";
 
 // zriz's default Image paints a decoded bitmap. Keep the original browser image
 // alive so GIF/APNG/WebP frames advance, and follow zriz's viewport transform.
-export function LiveCropperImage({ src }: { src: string }) {
+export function LiveCropperImage({ src }: { src: string | Blob }) {
   const cropper = useContext(CropperContext);
   const image = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    if (typeof src === "string" || !image.current) return;
+    const objectUrl = URL.createObjectURL(src);
+    image.current.src = objectUrl;
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [src]);
   useEffect(() => {
     if (!cropper) return;
     const view = viewOf(cropper);
@@ -24,7 +30,7 @@ export function LiveCropperImage({ src }: { src: string }) {
   return (
     <img
       ref={image}
-      src={src}
+      src={typeof src === "string" ? src : undefined}
       alt=""
       aria-hidden="true"
       draggable={false}

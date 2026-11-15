@@ -8,7 +8,7 @@ import {
   type BannerCrop,
 } from "@/lib/api";
 import { showRetryToast } from "@/lib/retry-toast";
-import { toast } from "@/components/ui/toast";
+import { toast } from "@/components/ui/toast-manager";
 
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);

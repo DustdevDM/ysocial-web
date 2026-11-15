@@ -10,7 +10,15 @@ import { PostActions } from "./post-actions";
 import type { Post } from "@/lib/api";
 import type { FeedState } from "./use-feed";
 
-export function PostCard({ post, feed }: { post: Post; feed: FeedState }) {
+export function PostCard({
+  post,
+  feed,
+  connectToNext = false,
+}: {
+  post: Post;
+  feed: FeedState;
+  connectToNext?: boolean;
+}) {
   const editorId = useId();
   const editorHelpId = useId();
   const [editing, setEditing] = useState(false);
@@ -36,7 +44,13 @@ export function PostCard({ post, feed }: { post: Post; feed: FeedState }) {
     if (feed.editPost(post, content)) setEditing(false);
   }
   return (
-    <article id={`post-${post.id}`} className="py-5">
+    <article id={`post-${post.id}`} className="relative py-5">
+      {connectToNext && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-4 left-4.25 top-15 w-0.5 rounded-full bg-border"
+        />
+      )}
       <div className="flex items-start gap-3">
         <div className="relative size-9 shrink-0">
           <div

@@ -6,7 +6,7 @@ import {
   type Post,
 } from "@/lib/api";
 import { beginReply, rememberPosts } from "./optimistic-actions";
-import { toast } from "@/components/ui/toast";
+import { toast } from "@/components/ui/toast-manager";
 
 type LocalPost = { status: "sending" | "confirmed"; post: Post };
 let snapshot: LocalPost[] = [];

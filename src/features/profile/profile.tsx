@@ -396,7 +396,12 @@ export function ProfilePage({
             ? profile.replies.map(({ post, thread }) => (
                 <section key={post.id} className="border-b">
                   {thread.map((ancestor) => (
-                    <PostCard key={ancestor.id} post={ancestor} feed={feed} />
+                    <PostCard
+                      key={ancestor.id}
+                      post={ancestor}
+                      feed={feed}
+                      connectToNext
+                    />
                   ))}
                   <PostCard post={post} feed={feed} />
                 </section>
