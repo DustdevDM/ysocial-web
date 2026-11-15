@@ -95,8 +95,9 @@ export function NavigationSidebar() {
         className="mt-auto flex shrink-0 flex-col items-start gap-2 px-3 pt-6 pb-1 text-xs text-muted-foreground lg:flex-row lg:flex-wrap lg:gap-x-3"
       >
         {[
-          { label: "Privacy", to: "/privacy", icon: Shield },
-          { label: "Terms", to: "/terms", icon: FileText },
+          { label: "Privacy", to: "/legal/privacy", icon: Shield },
+          { label: "Terms", to: "/legal/terms", icon: FileText },
+          { label: "Imprint", to: "/legal/imprint", icon: FileText },
           {
             label: "Open Source",
             to: "https://git.ysocial.cc/",
