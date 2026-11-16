@@ -1,32 +1,63 @@
-# SolidStart
+# Run the web app in production
 
-Everything you need to build a Solid project, powered by [`solid-start`](https://start.solidjs.com);
+Build the frontend and serve `dist` with [Caddy 2](https://caddyserver.com/docs/install).
+Run these commands from `web`:
 
-## Creating a project
-
-```bash
-# create a new project in the current directory
-npm init solid@latest
-
-# create a new project in my-app
-npm init solid@latest my-app
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+caddy run --config Caddyfile --adapter caddyfile
 ```
 
-## Developing
+The Caddyfile defaults to plain HTTP on `:8080` with automatic HTTPS off, which
+is what the container and Kubernetes use (TLS terminates at the ingress). For a
+standalone host that serves HTTPS itself, set `AUTO_HTTPS=on` and `SITE_ADDRESS`
+to a domain. Point DNS at the host and
+allow ports 80 and 443 so Caddy can obtain and renew HTTPS certificates.
+Run Caddy under your host's service manager and preserve its certificate data.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Set these environment variables in the Caddy service:
 
-```bash
-npm run dev
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `SITE_ADDRESS` | `:8080` | Listen address, or a public domain when `AUTO_HTTPS=on`. |
+| `AUTO_HTTPS` | `off` | Set to `on` for Caddy-managed certificates on a standalone host. |
+| `API_UPSTREAM` | `127.0.0.1:3100` | API address reachable from Caddy (`api:3100` in the image). |
+| `WEB_ROOT` | `dist` | Build directory. Use an absolute path when Caddy runs from another directory. |
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+Start the API separately using `pnpm start` from `api`, with its required
+environment variables configured. Set the API's `APP_ORIGIN` to the public web
+origin, such as `https://ysocial.cc`, and `NODE_ENV=production`.
+Keep the API port private and reachable from Caddy.
+
+The Caddyfile forwards `/api`, `/auth`, and their subpaths to the API without
+stripping the prefix. API errors stay API responses. All other requests serve
+existing files from `dist` or fall back to `index.html`, so direct visits to
+`/@handle` and nested client routes work. See Caddy's
+[SPA hosting pattern](https://caddyserver.com/docs/caddyfile/patterns#single-page-apps-spas).
+
+`pnpm dev` and `pnpm preview` are for local development and build previews.
+
+## Run with Docker
+
+From the parent directory, build with `docker build -t ysocial-web ./web`.
+The image builds the frontend and serves it with Caddy on port 8080 as a
+non-root user (uid 1001). It proxies `/api` and `/auth` to `api:3100`, so
+connect both containers to the same Docker network and give the API container
+the name or network alias `api`. Override `API_UPSTREAM` for another address.
+
+```sh
+docker run -d --name web --network ysocial -p 3000:8080 ysocial-web
 ```
 
-## Building
+The image runs with a read-only root filesystem and no capabilities
+(`--read-only --tmpfs /tmp --cap-drop ALL`). `GET /healthz` returns `200 ok`
+without touching the API, for container and Kubernetes probes.
 
-Solid apps are built with Nitro _presets_, which optimise your project for deployment to different environments.
+After deployment, check that `/@handle` returns the app HTML, a built asset
+returns its file content, and `/auth/me` returns the API response. Also check
+that an unknown `/api/...` path returns the API's error instead of app HTML.
 
-By default, `npm run build` will generate a Node app under `.output` that you can run with `npm start`. To use a different preset, set it on the `nitro()` plugin in your `vite.config.ts`.
+Caching: `/assets/*` (hashed build output) is served `immutable` and never falls
+back to `index.html`; everything else is `no-cache`.
 
-## This project was created with the [Solid CLI](https://github.com/solidjs-community/solid-cli)
