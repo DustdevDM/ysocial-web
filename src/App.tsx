@@ -84,6 +84,7 @@ function AppShell() {
                   session={auth.session}
                   onAvatarSaved={auth.updateAvatar}
                   onBannerSaved={auth.updateBanner}
+                  onProfileSaved={auth.updateProfile}
                 />
               }
             />
@@ -99,9 +100,15 @@ function AppShell() {
             />
             <Route path="/messages" element={<ComingSoon title="Messages" />} />
             <Route path="/search" element={<ComingSoon title="Search" />} />
-            <Route path="/legal/privacy" element={<ComingSoon title="Privacy" />} />
+            <Route
+              path="/legal/privacy"
+              element={<ComingSoon title="Privacy" />}
+            />
             <Route path="/legal/terms" element={<ComingSoon title="Terms" />} />
-            <Route path="/legal/imprint" element={<ComingSoon title="Imprint" />} />
+            <Route
+              path="/legal/imprint"
+              element={<ComingSoon title="Imprint" />}
+            />
             <Route
               path="/settings/feed"
               element={<ComingSoon title="Feed preferences" />}
@@ -163,10 +170,12 @@ function ProfileRoute({
   session,
   onAvatarSaved,
   onBannerSaved,
+  onProfileSaved,
 }: {
   session: Session | null;
   onAvatarSaved: (userId: string, avatarUrl: string) => void;
   onBannerSaved: AuthState["updateBanner"];
+  onProfileSaved: AuthState["updateProfile"];
 }) {
   const { profileHandle = "" } = useParams();
   if (!/^@[a-z0-9_]{3,32}$/.test(profileHandle)) return <NotFound />;
@@ -178,6 +187,7 @@ function ProfileRoute({
       session={session}
       onAvatarSaved={onAvatarSaved}
       onBannerSaved={onBannerSaved}
+      onProfileSaved={onProfileSaved}
     />
   );
 }

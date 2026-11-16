@@ -102,7 +102,28 @@ export function useAuth() {
         : current,
     );
   }
+  function updateProfile(
+    userId: string,
+    profile: Awaited<ReturnType<typeof api.updateProfile>>,
+  ) {
+    sessionRevision.current++;
+    setSession((current) =>
+      current?.authenticated &&
+      !current.needsOnboarding &&
+      current.user.id === userId
+        ? {
+            ...current,
+            user: {
+              ...current.user,
+              handle: profile.handle,
+              displayName: profile.displayName,
+            },
+          }
+        : current,
+    );
+  }
   return {
+    updateProfile,
     updateBanner,
     updateAvatar,
     session,

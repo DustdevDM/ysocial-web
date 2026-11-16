@@ -249,6 +249,14 @@ function request<T>(
 }
 const postPath = (id: string) => `/api/posts/${encodeURIComponent(id)}`;
 export const api = {
+  handleAvailability: (handle: string, signal?: AbortSignal) =>
+    request(
+      `/api/profiles/${encodeURIComponent(handle)}/availability`,
+      z.object({ available: z.boolean() }),
+      "GET",
+      undefined,
+      signal,
+    ),
   updateProfile: (
     profile: Partial<
       Pick<Profile["profile"], "handle" | "displayName" | "bio">

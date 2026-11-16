@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   CalendarDays,
   Camera,
+  Pencil,
   FileText,
   UserCheck,
   UserPlus,
@@ -22,7 +23,7 @@ import {
 } from "lucide-react";
 import { IconButton, IconLink } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
@@ -35,6 +36,7 @@ import {
 import { BannerImage } from "./banner-image";
 import { BannerEditor } from "./banner-editor";
 import { AvatarCropper } from "./avatar-cropper";
+import { ProfileForm } from "./profile-form";
 import { PostCard } from "@/features/feed/post-card";
 import { useFeed } from "@/features/feed/use-feed";
 import { ProfileSkeleton } from "@/components/loading-skeletons";
@@ -52,10 +54,15 @@ export function ProfilePage({
   session,
   onAvatarSaved,
   onBannerSaved,
+  onProfileSaved,
 }: {
   handle: string;
   session: Session | null;
   onAvatarSaved: (userId: string, avatarUrl: string) => void;
+  onProfileSaved: (
+    userId: string,
+    profile: Awaited<ReturnType<typeof api.updateProfile>>,
+  ) => void;
   onBannerSaved: (
     userId: string,
     bannerUrl: string | null,
@@ -64,6 +71,9 @@ export function ProfilePage({
 }) {
   const [loadedProfile, setProfile] = useState<Profile | null>(null);
   const [pictureDialogOpen, setPictureDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const navigate = useNavigate();
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"posts" | "replies" | "reposts">("posts");
   const viewer =
@@ -157,7 +167,7 @@ export function ProfilePage({
       : `@${handle}`,
   );
   return (
-    <div className="mx-auto max-w-xl">
+    <div className="mx-auto min-w-0 max-w-xl">
       <header className="mb-4 flex items-center gap-3">
         <IconLink to="/" label="Back to feed">
           <ArrowLeft />
@@ -282,14 +292,61 @@ export function ProfilePage({
             )}
           </div>
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-semibold">
+            <div className="min-w-0 flex-1">
+              <h1 className="wrap-anywhere text-xl font-semibold">
                 {profile.profile.displayName}
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="wrap-anywhere text-sm text-muted-foreground">
                 @{profile.profile.handle}
               </p>
             </div>
+            {ownProfile && (
+              <Dialog
+                open={editDialogOpen}
+                onOpenChange={(open) => {
+                  if (!savingProfile) setEditDialogOpen(open);
+                }}
+              >
+                <DialogTrigger render={<Button variant="outline" />}>
+                  <Pencil aria-hidden="true" />
+                  Edit
+                </DialogTrigger>
+                <DialogContent
+                  className="max-h-[90dvh] overflow-y-auto p-6 sm:max-w-lg"
+                  showCloseButton={!savingProfile}
+                >
+                  <DialogHeader>
+                    <DialogTitle>Edit profile</DialogTitle>
+                    <DialogDescription>
+                      Update your name, handle, and bio.
+                    </DialogDescription>
+                  </DialogHeader>
+                  {editDialogOpen && (
+                    <ProfileForm
+                      appearance="dialog"
+                      userId={profile.profile.id}
+                      profile={profile.profile}
+                      onSavingChange={setSavingProfile}
+                      onCancel={() => setEditDialogOpen(false)}
+                      onSaved={(updated) => {
+                        setProfile((current) =>
+                          current
+                            ? {
+                                ...current,
+                                profile: { ...current.profile, ...updated },
+                              }
+                            : current,
+                        );
+                        onProfileSaved(profile.profile.id, updated);
+                        setEditDialogOpen(false);
+                        if (updated.handle !== handle)
+                          navigate(`/@${updated.handle}`, { replace: true });
+                      }}
+                    />
+                  )}
+                </DialogContent>
+              </Dialog>
+            )}
             {session &&
               profile.profile.id !== viewer?.id &&
               (viewer ? (
@@ -358,7 +415,7 @@ export function ProfilePage({
             </span>
           </div>
           {profile.profile.bio && (
-            <p className="mt-3 whitespace-pre-wrap wrap-break-words text-sm">
+            <p className="mt-3 whitespace-pre-wrap wrap-anywhere text-sm">
               {profile.profile.bio}
             </p>
           )}

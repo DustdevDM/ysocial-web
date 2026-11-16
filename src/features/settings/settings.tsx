@@ -4,9 +4,6 @@ import { Link } from "react-router";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-
 import {
   Dialog,
   DialogContent,
@@ -29,7 +26,7 @@ import { BannerEditor } from "@/features/profile/banner-editor";
 import { updateAuthor } from "@/features/feed/optimistic-actions";
 
 import { usePageTitle } from "@/hooks/use-page-title";
-import { profileChanges } from "./profile-update";
+import { ProfileForm } from "@/features/profile/profile-form";
 
 type SettingsUser = Extract<Session, { needsOnboarding: false }>["user"];
 
@@ -87,14 +84,7 @@ function ProfileSettings({
   auth: AuthState;
 }) {
   const [profile, setProfile] = useState<Profile["profile"] | null>(null);
-  const [draft, setDraft] = useState({
-    handle: user.handle,
-    displayName: user.displayName,
-    bio: "",
-  });
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   useEffect(() => {
@@ -104,11 +94,6 @@ function ProfileSettings({
       .then((result) => {
         if (controller.signal.aborted) return;
         setProfile(result.profile);
-        setDraft({
-          handle: result.profile.handle,
-          displayName: result.profile.displayName,
-          bio: result.profile.bio,
-        });
         setError("");
       })
       .catch((error: unknown) => {
@@ -126,35 +111,6 @@ function ProfileSettings({
     )
       throw new ApiError(403, "retry_account_changed");
   }
-  async function save(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!changed) return;
-    setSaving(true);
-    setError("");
-    setSaved(false);
-    try {
-      await verifyAccount();
-      const updated = await api.updateProfile(changes);
-      updateAuthor(user.id, {
-        handle: updated.handle,
-        displayName: updated.displayName,
-      });
-      setProfile((current) => (current ? { ...current, ...updated } : current));
-      setDraft(updated);
-      setSaved(true);
-      await auth.reload();
-    } catch (error) {
-      setError(errorMessage(error));
-    } finally {
-      setSaving(false);
-    }
-  }
-  function change(field: keyof typeof draft, value: string) {
-    setDraft((current) => ({ ...current, [field]: value }));
-    setSaved(false);
-  }
-  const changes = profile ? profileChanges(profile, draft) : {};
-  const changed = Object.keys(changes).length > 0;
   return (
     <div className="space-y-3">
       <div className="relative h-9 w-36 rounded-xl bg-muted [&_span]:opacity-100">
@@ -208,72 +164,17 @@ function ProfileSettings({
           </p>
         )
       ) : (
-        <form onSubmit={(event) => void save(event)} className="space-y-3">
-          <fieldset disabled={saving} className="space-y-3">
-            <div className="space-y-1">
-              <label htmlFor="settings-name" className="text-sm font-medium">
-                Display name
-              </label>
-              <Input
-                id="settings-name"
-                required
-                maxLength={80}
-                value={draft.displayName}
-                onChange={(event) => change("displayName", event.target.value)}
-                autoComplete="nickname"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="settings-handle" className="text-sm font-medium">
-                Handle
-              </label>
-              <Input
-                id="settings-handle"
-                required
-                minLength={3}
-                maxLength={32}
-                pattern="[a-z0-9_]{3,32}"
-                value={draft.handle}
-                onChange={(event) => change("handle", event.target.value)}
-
-                autoComplete="username"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="settings-bio" className="text-sm font-medium">
-                Bio
-              </label>
-              <Textarea
-                id="settings-bio"
-                maxLength={2000}
-                rows={4}
-                value={draft.bio}
-                onChange={(event) => change("bio", event.target.value)}
-                aria-describedby="bio-count"
-              />
-              <p
-                id="bio-count"
-                className="text-right text-xs tabular-nums text-muted-foreground"
-              >
-                {draft.bio.length.toLocaleString()}/2,000
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                type="submit"
-                disabled={!changed || !draft.displayName.trim()}
-              >
-                {saving ? "Saving…" : "Save profile"}
-              </Button>
-              <p
-                role="status"
-                className="flex items-center gap-1 text-sm text-muted-foreground"
-              >
-                {saved && <>Profile saved</>}
-              </p>
-            </div>
-          </fieldset>
-        </form>
+        <ProfileForm
+          key={profile.id}
+          userId={user.id}
+          profile={profile}
+          onSaved={(updated) => {
+            setProfile((current) =>
+              current ? { ...current, ...updated } : current,
+            );
+            auth.updateProfile(user.id, updated);
+          }}
+        />
       )}
     </div>
   );
