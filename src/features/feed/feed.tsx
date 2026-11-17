@@ -9,9 +9,19 @@ import { PostCard } from "./post-card";
 import type { FeedState } from "./use-feed";
 import { PullToRefresh } from "./pull-to-refresh.tsx";
 
-export function Feed({ feed }: { feed: FeedState }) {
+export function Feed({
+  feed,
+  refreshKey,
+}: {
+  feed: FeedState;
+  refreshKey?: string;
+}) {
   return (
-    <PullToRefresh disabled={feed.loading} onRefresh={feed.refresh}>
+    <PullToRefresh
+      disabled={feed.loading}
+      onRefresh={feed.refresh}
+      refreshKey={refreshKey}
+    >
       <div className="min-h-13 md:min-h-14">
         {feed.sessionLoading ? (
           <ComposerSkeleton />

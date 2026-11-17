@@ -16,15 +16,43 @@ export function PullToRefresh({
   children,
   disabled,
   onRefresh,
+  refreshKey,
 }: {
   children: ReactNode;
   disabled: boolean;
   onRefresh: () => Promise<void>;
+  refreshKey?: string;
 }) {
   const root = useRef<HTMLDivElement>(null);
+  const refreshing = useRef(false);
+  const previousRefreshKey = useRef(refreshKey);
   const [state, setState] = useState<PullState>({ kind: "idle" });
-  const enabled = useEffectEvent(() => !disabled);
-  const refresh = useEffectEvent(onRefresh);
+  const enabled = useEffectEvent(() => !disabled && !refreshing.current);
+  const refresh = useEffectEvent(async () => {
+    if (!enabled()) return;
+    refreshing.current = true;
+    setState({ kind: "refreshing" });
+    try {
+      // Keep fast responses visible long enough for the slide and spinner.
+      await Promise.all([
+        onRefresh(),
+        new Promise<void>((resolve) => window.setTimeout(resolve, 450)),
+      ]);
+    } finally {
+      refreshing.current = false;
+      if (root.current) setState({ kind: "idle" });
+    }
+  });
+  const updateGesture = useEffectEvent((next: PullState) => {
+    if (!refreshing.current) setState(next);
+  });
+
+  useEffect(() => {
+    // Initial mounting already loads the feed. Reselecting Home animates it.
+    if (previousRefreshKey.current === refreshKey) return;
+    previousRefreshKey.current = refreshKey;
+    void refresh();
+  }, [refreshKey]);
 
   useEffect(() => {
     const container = root.current?.closest<HTMLElement>(".content-scroll");
@@ -32,7 +60,7 @@ export function PullToRefresh({
     return attachPullToRefresh({
       container,
       enabled,
-      onChange: setState,
+      onChange: updateGesture,
       onRefresh: refresh,
     });
   }, []);
@@ -49,7 +77,7 @@ export function PullToRefresh({
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-center gap-2 overflow-hidden text-xs text-muted-foreground transition-[height] duration-200 motion-reduce:transition-none md:hidden"
+        className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-center gap-2 overflow-hidden text-xs text-muted-foreground transition-[height] duration-200 motion-reduce:transition-none"
         style={{
           height: distance,
           transitionDuration: state.kind === "pulling" ? "0ms" : undefined,

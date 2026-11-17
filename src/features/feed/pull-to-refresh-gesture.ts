@@ -60,6 +60,7 @@ export function attachPullToRefresh({
     if (!gesture) return;
     if (
       !mobile.matches ||
+      !enabled() ||
       event.touches.length !== 1 ||
       container.scrollTop > 0
     ) {

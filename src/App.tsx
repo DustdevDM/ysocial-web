@@ -47,15 +47,22 @@ export function App() {
 function AppShell() {
   const auth = useAuth();
   const centerScroll = useRef<HTMLElement>(null);
-  const { pathname } = useLocation();
+  const { pathname, key: navigationKey } = useLocation();
   const profileHandle = matchPath("/:profileHandle", pathname)?.params
     .profileHandle;
   const hideAccountSidebar =
     /^@[a-z0-9_]{3,32}$/.test(profileHandle ?? "") ||
     matchPath("/profile", pathname) !== null;
   useEffect(() => {
-    centerScroll.current?.scrollTo(0, 0);
-  }, [pathname]);
+    centerScroll.current?.scrollTo({
+      top: 0,
+      behavior:
+        pathname === "/" &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "smooth"
+          : "instant",
+    });
+  }, [pathname, navigationKey]);
   return (
     <div className="flex h-dvh min-h-0 flex-col">
       <MobileHeader auth={auth} />
@@ -139,7 +146,8 @@ function AppShell() {
 function HomeFeed({ session }: { session: Session | null }) {
   usePageTitle("Feed");
   const feed = useFeed(session);
-  return <Feed feed={feed} />;
+  const { key: navigationKey } = useLocation();
+  return <Feed feed={feed} refreshKey={navigationKey} />;
 }
 function MyProfileRoute({ auth }: { auth: AuthState }) {
   usePageTitle("Profile");
