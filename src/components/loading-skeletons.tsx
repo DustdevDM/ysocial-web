@@ -93,7 +93,7 @@ export function ProfileSkeleton() {
   return (
     <LoadingSkeleton label="Loading profile…" lockScroll>
       <div className="relative mb-12">
-        <Skeleton className="h-28 w-full rounded-xl" />
+        <Skeleton className="aspect-3/1 w-full rounded-xl" />
         <Skeleton className="absolute -bottom-8 left-4 size-16 rounded-[30%] ring-4 ring-background [corner-shape:squircle]" />
       </div>
       <div className="flex items-start justify-between gap-3">

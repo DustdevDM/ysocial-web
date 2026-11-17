@@ -12,6 +12,10 @@ import {
 import { ArrowLeft, Construction, SearchX } from "lucide-react";
 import { NavigationSidebar } from "@/components/layout/navigation-sidebar";
 import { AccountSidebar } from "@/components/layout/account-sidebar";
+import {
+  MobileHeader,
+  MobileNavigation,
+} from "@/components/layout/mobile-navigation";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { IconLink } from "@/components/ui/icon-button";
@@ -54,13 +58,14 @@ function AppShell() {
   }, [pathname]);
   return (
     <div className="flex h-dvh min-h-0 flex-col">
+      <MobileHeader auth={auth} />
       <ConnectionBanner />
       <main
         className={cn(
-          "grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden divide-x divide-border",
+          "grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:divide-x md:divide-border",
           hideAccountSidebar
-            ? "grid-cols-[4rem_minmax(0,1fr)] lg:grid-cols-[13rem_minmax(0,1fr)]"
-            : "grid-cols-[4rem_minmax(0,1fr)_4rem] lg:grid-cols-[13rem_minmax(0,1fr)_22rem]",
+            ? "md:grid-cols-[4rem_minmax(0,1fr)] lg:grid-cols-[13rem_minmax(0,1fr)]"
+            : "md:grid-cols-[4rem_minmax(0,1fr)_4rem] lg:grid-cols-[13rem_minmax(0,1fr)_22rem]",
         )}
       >
         <NavigationSidebar />
@@ -68,7 +73,7 @@ function AppShell() {
           ref={centerScroll}
           aria-label="Main content"
           tabIndex={0}
-          className="content-scroll min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain px-5 py-4 has-[[data-skeleton-scroll-lock]]:overflow-y-hidden sm:px-10 sm:py-6 lg:px-12"
+          className="content-scroll min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] has-[[data-skeleton-scroll-lock]]:overflow-y-hidden sm:px-10 sm:pt-6 md:pb-6 lg:px-12"
         >
           <Account auth={auth} />
           <Routes>
@@ -126,6 +131,7 @@ function AppShell() {
         </section>
         {!hideAccountSidebar && <AccountSidebar auth={auth} />}
       </main>
+      <MobileNavigation auth={auth} />
     </div>
   );
 }

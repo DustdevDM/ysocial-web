@@ -1,5 +1,16 @@
 import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -32,6 +43,14 @@ export function ConfirmationDialog({
 }) {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
+  const mobile = useIsMobile();
+  const Root = mobile ? Dialog : AlertDialog;
+  const Content = mobile ? DialogContent : AlertDialogContent;
+  const Header = mobile ? DialogHeader : AlertDialogHeader;
+  const Title = mobile ? DialogTitle : AlertDialogTitle;
+  const Description = mobile ? DialogDescription : AlertDialogDescription;
+  const Footer = mobile ? DialogFooter : AlertDialogFooter;
+  const Cancel = mobile ? DialogClose : AlertDialogCancel;
   async function confirm() {
     if (pending) return;
     setFailed(false);
@@ -53,7 +72,7 @@ export function ConfirmationDialog({
     }
   }
   return (
-    <AlertDialog
+    <Root
       open={open}
       onOpenChange={(next) => {
         if (!pending) {
@@ -62,18 +81,20 @@ export function ConfirmationDialog({
         }
       }}
     >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
+      <Content>
+        <Header>
+          <Title>{title}</Title>
+          <Description>{description}</Description>
+        </Header>
         {failed && (
           <p role="alert" className="text-sm text-destructive">
             {error || "Unable to complete this action. Please try again."}
           </p>
         )}
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+        <Footer>
+          <Cancel disabled={pending} render={<Button variant="outline" />}>
+            Cancel
+          </Cancel>
           <AlertDialogAction
             variant={destructive ? "destructive" : "default"}
             disabled={pending}
@@ -84,8 +105,8 @@ export function ConfirmationDialog({
             )}
             {confirmLabel}
           </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        </Footer>
+      </Content>
+    </Root>
   );
 }

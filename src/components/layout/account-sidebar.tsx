@@ -18,7 +18,7 @@ export function AccountSidebar({ auth }: { auth: AuthState }) {
             : "Trending topics"
       }
       aria-busy={session === null}
-      className="min-h-0 min-w-0 overflow-hidden p-1 pt-4 sm:pt-6 lg:p-3 lg:pt-6"
+      className="hidden min-h-0 min-w-0 overflow-hidden p-1 pt-4 md:block md:pt-6 lg:p-3 lg:pt-6"
     >
       {session !== null && (
         <>
