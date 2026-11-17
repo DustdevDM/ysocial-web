@@ -1,3 +1,4 @@
+import type { MouseEventHandler } from "react";
 import { Link, NavLink } from "react-router";
 import { CodeXml, FileText, Shield } from "lucide-react";
 import {
@@ -10,8 +11,10 @@ import { NotificationsBell } from "@/features/notifications/notifications";
 
 export function NavigationSidebar({
   showNotifications = false,
+  onLogoClick,
 }: {
   showNotifications?: boolean;
+  onLogoClick: MouseEventHandler<HTMLAnchorElement>;
 }) {
   return (
     <aside
@@ -23,6 +26,7 @@ export function NavigationSidebar({
           to="/"
           className="w-fit max-w-full rounded-lg p-1 outline-none focus-visible:ring-2 focus-visible:ring-ring lg:px-3"
           aria-label="ysocial home"
+          onClick={onLogoClick}
         >
           <img
             src="/favicon.png"

@@ -1,3 +1,4 @@
+import type { MouseEventHandler } from "react";
 import { House, Search, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { AccountMenu } from "@/features/auth/account-menu";
@@ -6,7 +7,13 @@ import { NotificationsBell } from "@/features/notifications/notifications";
 import { FloatingNavigation } from "@/components/ui/floating-navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-export function MobileHeader({ auth }: { auth: AuthState }) {
+export function MobileHeader({
+  auth,
+  onLogoClick,
+}: {
+  auth: AuthState;
+  onLogoClick: MouseEventHandler<HTMLAnchorElement>;
+}) {
   const signedIn = auth.session?.authenticated && !auth.session.needsOnboarding;
 
   return (
@@ -15,6 +22,7 @@ export function MobileHeader({ auth }: { auth: AuthState }) {
         <Link
           to="/"
           aria-label="ysocial home"
+          onClick={onLogoClick}
           className="flex min-h-11 items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <img

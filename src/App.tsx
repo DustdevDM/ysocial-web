@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import {
   BrowserRouter,
   Link,
@@ -7,6 +7,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
   useParams,
 } from "react-router";
 import { ArrowLeft, Construction, SearchX } from "lucide-react";
@@ -49,12 +50,22 @@ export function App() {
 function AppShell() {
   const auth = useAuth();
   const centerScroll = useRef<HTMLElement>(null);
+  const logoClickCount = useRef(0);
+  const navigate = useNavigate();
   const { pathname, key: navigationKey } = useLocation();
   const profileHandle = matchPath("/:profileHandle", pathname)?.params
     .profileHandle;
   const hideAccountSidebar =
     /^@[a-z0-9_]{3,32}$/.test(profileHandle ?? "") ||
     matchPath("/profile", pathname) !== null;
+  function handleLogoClick(event: MouseEvent<HTMLAnchorElement>) {
+    logoClickCount.current += 1;
+    if (logoClickCount.current === 4) {
+      logoClickCount.current = 0;
+      event.preventDefault();
+      navigate("/asettings");
+    }
+  }
   useEffect(() => {
     centerScroll.current?.scrollTo({
       top: 0,
@@ -79,7 +90,7 @@ function AppShell() {
       }
     >
       <div className="flex h-dvh min-h-0 flex-col">
-        <MobileHeader auth={auth} />
+        <MobileHeader auth={auth} onLogoClick={handleLogoClick} />
         <ConnectionBanner />
         <main
           className={cn(
@@ -89,7 +100,10 @@ function AppShell() {
               : "md:grid-cols-[4rem_minmax(0,1fr)_4rem] lg:grid-cols-[13rem_minmax(0,1fr)_22rem]",
           )}
         >
-          <NavigationSidebar showNotifications={hideAccountSidebar} />
+          <NavigationSidebar
+            showNotifications={hideAccountSidebar}
+            onLogoClick={handleLogoClick}
+          />
           <section
             ref={centerScroll}
             aria-label="Main content"
