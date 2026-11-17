@@ -50,6 +50,7 @@ export function PostCard({
   const mine = post.author.id === feed.viewerId;
   const busy = feed.pending.includes(post.id);
   const length = Array.from(content.trim()).length;
+  const validCaption = (length > 0 || post.gif !== null) && length <= 2000;
   const changed = content.trim() !== post.content.trim();
   const profilePath = `/@${post.author.handle}`;
   const openable = !focused && !optimistic && !editing;
@@ -83,7 +84,7 @@ export function PostCard({
     setEditing(false);
   }
   function save() {
-    if (busy || !changed || !length || length > 2000) return;
+    if (busy || !changed || !validCaption) return;
     if (feed.editPost(post, content)) setEditing(false);
   }
   return (
@@ -198,7 +199,7 @@ export function PostCard({
                     <IconButton
                       label="Save changes"
                       size="icon-sm"
-                      disabled={busy || !changed || !length || length > 2000}
+                      disabled={busy || !changed || !validCaption}
                       onClick={save}
                     >
                       <Check />
@@ -249,7 +250,7 @@ export function PostCard({
               <MentionTextarea
                 id={editorId}
                 aria-describedby={editorHelpId}
-                aria-invalid={!length || length > 2000}
+                aria-invalid={!validCaption}
                 autoFocus
                 rows={3}
                 className="max-h-96 resize-y text-sm leading-relaxed"
@@ -277,7 +278,7 @@ export function PostCard({
                 className="flex justify-between gap-3 text-xs text-muted-foreground"
               >
                 <p>
-                  {!length
+                  {!length && !post.gif
                     ? "Write something before saving."
                     : length > 2000
                       ? `Remove ${length - 2000} characters to save.`
@@ -291,15 +292,26 @@ export function PostCard({
               </div>
             </div>
           ) : (
-            <p
-              data-selectable
-              className={cn(
-                "mt-2 whitespace-pre-wrap break-words leading-relaxed",
-                focused ? "text-base" : "text-sm",
-              )}
-            >
-              <PostText post={post} />
-            </p>
+            post.content && (
+              <p
+                data-selectable
+                className={cn(
+                  "mt-2 whitespace-pre-wrap break-words leading-relaxed",
+                  focused ? "text-base" : "text-sm",
+                )}
+              >
+                <PostText post={post} />
+              </p>
+            )
+          )}
+          {post.gif && (
+            <img
+              src={post.gif.url}
+              alt={post.gif.title}
+              loading="lazy"
+              decoding="async"
+              className="mt-2 max-h-96 w-auto max-w-full rounded-xl object-contain"
+            />
           )}
           <PostActions post={post} feed={feed} />
           {post.friendLikes > 0 && (

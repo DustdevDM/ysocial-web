@@ -14,6 +14,7 @@ const userSchema = z.object({
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
 });
+const postGifSchema = z.object({ url: z.string(), title: z.string() });
 const postSchema = z.object({
   mentions: z
     .array(
@@ -23,6 +24,7 @@ const postSchema = z.object({
   id: z.string(),
   parentId: z.string().nullable(),
   content: z.string(),
+  gif: postGifSchema.nullable().default(null),
   createdAt: z.string(),
   editedAt: z.string().nullable(),
   editExpiresAt: z.string(),
@@ -92,6 +94,9 @@ const profileSchema = z.object({
   serverNow: z.string(),
 });
 export type Post = z.infer<typeof postSchema>;
+export type GifSearchItem = Awaited<
+  ReturnType<typeof api.searchGifs>
+>["items"][number];
 export type TopicCount = z.infer<typeof topicCountSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type Profile = z.infer<typeof profileSchema>;
@@ -588,8 +593,12 @@ export const api = {
       undefined,
       signal,
     ),
-  publish: (content: string, clientId?: string) =>
-    request("/api/posts", postResponseSchema, "POST", { content, clientId }),
+  publish: (content: string, clientId?: string, gifToken?: string) =>
+    request("/api/posts", postResponseSchema, "POST", {
+      content,
+      clientId,
+      gifToken,
+    }),
   replies: (id: string, cursor?: string, signal?: AbortSignal) =>
     request(
       `${postPath(id)}/replies${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
@@ -598,10 +607,11 @@ export const api = {
       undefined,
       signal,
     ),
-  reply: (id: string, content: string, clientId?: string) =>
+  reply: (id: string, content: string, clientId?: string, gifToken?: string) =>
     request(`${postPath(id)}/replies`, postResponseSchema, "POST", {
       content,
       clientId,
+      gifToken,
     }),
   like: (id: string, liked: boolean) =>
     request(

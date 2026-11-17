@@ -1,5 +1,5 @@
 import { LiveCropperImage } from "./live-cropper-image";
-import { GifGrid } from "./gif-grid";
+import { GifGrid } from "@/features/gifs/gif-grid";
 import * as Cropper from "@zriz/react/cropper";
 import { useZoom, type Cropper as CropperApi } from "@zriz/react";
 import "@zriz/react/styles.css";
