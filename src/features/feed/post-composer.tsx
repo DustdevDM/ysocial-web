@@ -19,13 +19,22 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { FeedState } from "./use-feed";
+import { splitWrittenTopics } from "@/lib/topics";
+import {
+  TopicSuggestionList,
+  topicOptionId,
+  useTopicSuggestions,
+} from "./topic-suggestions";
 
 export function PostComposer({
   feed,
   placeholder = "What's on your mind?",
+  topics = true,
 }: {
   feed: FeedState;
   placeholder?: string;
+  /** Offer #topic completion. Only posts have topics, replies do not. */
+  topics?: boolean;
 }) {
   if (!feed.sessionLoading && !feed.authenticated) {
     return (
@@ -57,7 +66,13 @@ export function PostComposer({
       </Dialog>
     );
   }
-  return <AuthenticatedPostComposer feed={feed} placeholder={placeholder} />;
+  return (
+    <AuthenticatedPostComposer
+      feed={feed}
+      placeholder={placeholder}
+      topics={topics}
+    />
+  );
 }
 
 const LIMIT = 2000;
@@ -121,9 +136,11 @@ function LimitRing({ length }: { length: number }) {
 function AuthenticatedPostComposer({
   feed,
   placeholder,
+  topics,
 }: {
   feed: FeedState;
   placeholder: string;
+  topics: boolean;
 }) {
   const [published, setPublished] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
@@ -132,7 +149,18 @@ function AuthenticatedPostComposer({
   const [height, setHeight] = useState<number>();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const mirror = useRef<HTMLDivElement>(null);
+  const highlight = useRef<HTMLDivElement>(null);
+  const scrolls = (height ?? 0) > MAX_HEIGHT;
   const helpId = useId();
+  const suggestionsId = useId();
+  const [caret, setCaret] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const pendingCaret = useRef<number | null>(null);
+  const suggestions = useTopicSuggestions(
+    draft,
+    caret,
+    topics && focused && feed.canPost,
+  );
   const length = Array.from(draft.trim()).length;
   const empty = length === 0;
   const valid = feed.canPost && !empty && length <= LIMIT;
@@ -149,11 +177,30 @@ function AuthenticatedPostComposer({
     return () => observer.disconnect();
   }, []);
 
+  // After a completion rewrites the text, put the caret behind the topic.
+  useLayoutEffect(() => {
+    if (pendingCaret.current === null) return;
+    textarea.current?.setSelectionRange(
+      pendingCaret.current,
+      pendingCaret.current,
+    );
+    pendingCaret.current = null;
+  }, [draft]);
+
   useEffect(() => {
     if (!published) return;
     const timer = setTimeout(() => setPublished(false), 2000);
     return () => clearTimeout(timer);
   }, [published]);
+
+  function pickTopic(name: string) {
+    const completed = suggestions.complete(name);
+    if (!completed) return;
+    pendingCaret.current = completed.caret;
+    setCaret(completed.caret);
+    setDraft(completed.text);
+    textarea.current?.focus();
+  }
 
   function publish() {
     if (!valid) return;
@@ -167,93 +214,169 @@ function AuthenticatedPostComposer({
   return (
     <Dialog open={attachmentsOpen} onOpenChange={setAttachmentsOpen}>
       {/* Equal 8px padding above, below and right of the buttons (36px). */}
-      <form
-        className="mx-auto flex w-full max-w-xl items-end gap-2 rounded-[1.75rem] bg-muted p-2 pl-4 transition-shadow focus-within:ring-1 focus-within:ring-border sm:pl-5"
-        aria-label="Post composer"
-        onSubmit={(event) => {
-          event.preventDefault();
-          publish();
-        }}
-      >
-        <div
-          className="relative min-w-0 flex-1 transition-[height] duration-200 ease-out"
-          style={{ height: height ? Math.min(height, MAX_HEIGHT) : undefined }}
+      <div className="relative mx-auto w-full max-w-xl">
+        <form
+          className="flex w-full items-end gap-2 rounded-[1.75rem] bg-muted p-2 pl-4 transition-shadow focus-within:ring-1 focus-within:ring-border sm:pl-5"
+          aria-label="Post composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            publish();
+          }}
         >
           <div
-            ref={mirror}
-            aria-hidden="true"
-            className={`pointer-events-none invisible absolute inset-x-0 top-0 min-h-9 break-words whitespace-pre-wrap ${textClass}`}
-          >
-            {draft || " "}
-            {"\u200b"}
-          </div>
-          <MentionTextarea
-            ref={textarea}
-            aria-label={placeholder.replace("…", "")}
-            aria-describedby={helpId}
-            placeholder={placeholder}
-            rows={1}
-            value={draft}
-            onValueChange={setDraft}
-            wrapperClassName="relative h-full"
-            disabled={!feed.canPost}
-            onChange={(event) => {
-              setPublished(false);
-              setDraft(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (
-                event.key === "Enter" &&
-                (event.ctrlKey || event.metaKey) &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                if (!event.repeat) publish();
-              }
-              if (event.key === "Escape" && !draft) {
-                event.currentTarget.blur();
-              }
-            }}
+            className="relative min-w-0 flex-1 transition-[height] duration-200 ease-out"
             style={{
-              overflowY: (height ?? 0) > MAX_HEIGHT ? "auto" : "hidden",
+              height: height ? Math.min(height, MAX_HEIGHT) : undefined,
             }}
-            className={`absolute inset-0 h-full min-h-0 resize-none field-sizing-fixed rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 dark:bg-transparent dark:disabled:bg-transparent ${textClass}`}
-          />
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <LimitRing length={length} />
-          <DialogTrigger
-            render={
-              <IconButton
-                label="Add attachment"
-                type="button"
-                className={`rounded-full text-muted-foreground transition-opacity ${empty ? "opacity-50" : ""}`}
-              />
-            }
           >
-            <Plus />
-          </DialogTrigger>
-          <IconButton
-            label="Publish post"
-            type="submit"
-            variant="default"
-            className="rounded-full"
-            disabled={!valid}
-          >
-            <ArrowUp />
-          </IconButton>
-        </div>
-        <p id={helpId} className="sr-only">
-          {feed.canPost
-            ? "Enter adds a new line. Press Ctrl+Enter or Command+Enter to post. Maximum 2000 characters."
-            : "Sign in and complete your profile to post or reply."}
-          {length >= RING_FROM &&
-            ` ${LIMIT - length >= 0 ? `${LIMIT - length} characters left.` : `${length - LIMIT} characters over the limit.`}`}
-        </p>
+            <div
+              ref={mirror}
+              aria-hidden="true"
+              className={`pointer-events-none invisible absolute inset-x-0 top-0 min-h-9 break-words whitespace-pre-wrap ${textClass}`}
+            >
+              {draft || " "}
+              {"\u200b"}
+            </div>
+            {topics && (
+              // Draws the text under the see-through textarea, so written
+              // #topics can be blue. Same box, font and scroll as the field.
+              <div
+                ref={highlight}
+                aria-hidden="true"
+                style={{ overflowY: scrolls ? "auto" : "hidden" }}
+                className={`pointer-events-none absolute inset-0 break-words whitespace-pre-wrap ${textClass}`}
+              >
+                {splitWrittenTopics(draft).map((part, index) =>
+                  part.topic ? (
+                    <span
+                      key={index}
+                      className="text-blue-600 dark:text-blue-400"
+                    >
+                      {part.text}
+                    </span>
+                  ) : (
+                    part.text
+                  ),
+                )}
+                {"\u200b"}
+              </div>
+            )}
+            <MentionTextarea
+              ref={textarea}
+              aria-label={placeholder.replace("…", "")}
+              aria-describedby={helpId}
+              aria-controls={suggestions.open ? suggestionsId : undefined}
+              aria-activedescendant={
+                suggestions.open && suggestions.index >= 0
+                  ? topicOptionId(suggestionsId, suggestions.index)
+                  : undefined
+              }
+              placeholder={placeholder}
+              rows={1}
+              value={draft}
+              onValueChange={setDraft}
+              wrapperClassName="relative h-full"
+              disabled={!feed.canPost}
+              onChange={(event) => {
+                setPublished(false);
+                setDraft(event.target.value);
+                setCaret(event.target.selectionStart);
+              }}
+              onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onScroll={(event) => {
+                if (highlight.current)
+                  highlight.current.scrollTop = event.currentTarget.scrollTop;
+              }}
+              onKeyDown={(event) => {
+                if (suggestions.open && !event.nativeEvent.isComposing) {
+                  const chosen =
+                    suggestions.items[Math.max(suggestions.index, 0)];
+                  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                    event.preventDefault();
+                    suggestions.move(event.key === "ArrowDown" ? 1 : -1);
+                    return;
+                  }
+                  if (
+                    (event.key === "Tab" && !event.shiftKey) ||
+                    (event.key === "Enter" &&
+                      !event.ctrlKey &&
+                      !event.metaKey &&
+                      !event.shiftKey &&
+                      suggestions.index >= 0)
+                  ) {
+                    event.preventDefault();
+                    pickTopic(chosen.name);
+                    return;
+                  }
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    suggestions.dismiss();
+                    return;
+                  }
+                }
+                if (
+                  event.key === "Enter" &&
+                  (event.ctrlKey || event.metaKey) &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  if (!event.repeat) publish();
+                }
+                if (event.key === "Escape" && !draft) {
+                  event.currentTarget.blur();
+                }
+              }}
+              style={{ overflowY: scrolls ? "auto" : "hidden" }}
+              className={`${topics ? "text-transparent caret-foreground " : ""}absolute inset-0 h-full min-h-0 resize-none field-sizing-fixed rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 dark:bg-transparent dark:disabled:bg-transparent ${textClass}`}
+            />
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <LimitRing length={length} />
+            <DialogTrigger
+              render={
+                <IconButton
+                  label="Add attachment"
+                  type="button"
+                  className={`rounded-full text-muted-foreground transition-opacity ${empty ? "opacity-50" : ""}`}
+                />
+              }
+            >
+              <Plus />
+            </DialogTrigger>
+            <IconButton
+              label="Publish post"
+              type="submit"
+              variant="default"
+              className="rounded-full"
+              disabled={!valid}
+            >
+              <ArrowUp />
+            </IconButton>
+          </div>
+          <p id={helpId} className="sr-only">
+            {feed.canPost
+              ? "Enter adds a new line. Press Ctrl+Enter or Command+Enter to post. Maximum 2000 characters."
+              : "Sign in and complete your profile to post or reply."}
+            {length >= RING_FROM &&
+              ` ${LIMIT - length >= 0 ? `${LIMIT - length} characters left.` : `${length - LIMIT} characters over the limit.`}`}
+          </p>
+          <p role="status" className="sr-only">
+            {published ? "Post added" : ""}
+          </p>
+        </form>
+        <TopicSuggestionList
+          id={suggestionsId}
+          suggestions={suggestions}
+          onPick={pickTopic}
+        />
         <p role="status" className="sr-only">
-          {published ? "Post added" : ""}
+          {suggestions.open
+            ? `${suggestions.items.length} topic suggestions. Use the arrow keys to choose and Tab to insert.`
+            : ""}
         </p>
-      </form>
+      </div>
       <DialogContent>
         <div className="flex size-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
           <Construction className="size-6" aria-hidden="true" />

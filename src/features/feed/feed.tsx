@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { RotateCcw } from "lucide-react";
 import {
   ComposerSkeleton,
@@ -18,9 +18,16 @@ const PREFETCH_DISTANCE = 900;
 export function Feed({
   feed,
   refreshKey,
+  header,
+  showComposer = true,
+  emptyMessage = "No posts yet.",
 }: {
   feed: FeedState;
   refreshKey?: string;
+  /** Shown where the composer would be, e.g. a topic's title. */
+  header?: ReactNode;
+  showComposer?: boolean;
+  emptyMessage?: string;
 }) {
   const sentinel = useRef<HTMLDivElement>(null);
   const { loadMore, loading, error, feedPosts } = feed;
@@ -47,13 +54,16 @@ export function Feed({
       onRefresh={feed.refresh}
       refreshKey={refreshKey}
     >
-      <div className="min-h-13 md:min-h-14">
-        {feed.sessionLoading ? (
-          <ComposerSkeleton />
-        ) : (
-          <PostComposer feed={feed} />
-        )}
-      </div>
+      {header}
+      {showComposer && (
+        <div className="min-h-13 md:min-h-14">
+          {feed.sessionLoading ? (
+            <ComposerSkeleton />
+          ) : (
+            <PostComposer feed={feed} />
+          )}
+        </div>
+      )}
       <div className="mx-auto mt-6 w-full max-w-xl divide-y divide-border">
         {feed.error && (
           <div role="alert" className="py-3">
@@ -76,7 +86,7 @@ export function Feed({
           />
         )}
         {!feed.loading && !feed.error && feed.feedPosts.length === 0 && (
-          <p className="py-4 text-muted-foreground">No posts yet.</p>
+          <p className="py-4 text-muted-foreground">{emptyMessage}</p>
         )}
         {feed.loadMore && feed.error && feed.feedPosts.length > 0 && (
           <div className="flex justify-center py-4">

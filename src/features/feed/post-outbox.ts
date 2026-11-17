@@ -7,10 +7,12 @@ import {
 } from "@/lib/api";
 import { beginReply, rememberPosts } from "./optimistic-actions";
 import { toast } from "@/components/ui/toast-manager";
+import { extractTopics } from "@/lib/topics";
 
 type LocalPost = { status: "sending" | "confirmed"; post: Post };
 let snapshot: LocalPost[] = [];
 const listeners = new Set<() => void>();
+const publishedListeners = new Set<() => void>();
 const inFlight = new Set<string>();
 
 function update(next: LocalPost[]) {
@@ -22,6 +24,13 @@ export function subscribeToLocalPosts(listener: () => void) {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
+  };
+}
+/** Called after a new top-level post was saved, e.g. to refresh trending topics. */
+export function subscribeToPublished(listener: () => void) {
+  publishedListeners.add(listener);
+  return () => {
+    publishedListeners.delete(listener);
   };
 }
 export function acknowledgePosts(posts: Post[]) {
@@ -60,6 +69,8 @@ export function publishOptimistically({
     reposts: 0,
     reposted: false,
     replies: 0,
+    // Replies are never tagged; the API confirms the same topics for posts.
+    topics: parentId ? [] : extractTopics(content),
   };
   let failedToastId: string | undefined;
   async function send(retry = false): Promise<boolean> {
@@ -121,6 +132,7 @@ export function publishOptimistically({
     } finally {
       inFlight.delete(optimistic.id);
     }
+    if (!parentId) for (const listener of publishedListeners) listener();
     onConfirmed?.();
     return true;
   }

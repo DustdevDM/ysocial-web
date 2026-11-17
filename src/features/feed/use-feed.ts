@@ -16,7 +16,7 @@ import {
 } from "./optimistic-actions";
 import { toast } from "@/components/ui/toast-manager";
 
-// Home-feed pages survive navigation, so coming back from a post shows the same
+// Feed pages (home, or one topic's) survive navigation, so coming back from a post shows the same
 // list instantly (and can restore the scroll position) while it revalidates.
 const feedCache = new Map<
   string,
@@ -28,10 +28,15 @@ export function useFeed(
   parentId?: string,
   autoLoad = true,
   onPublished?: () => void,
+  /** Only top-level posts with this (normalized) topic. */
+  topic?: string,
 ) {
   const viewerId =
     session?.authenticated && !session.needsOnboarding ? session.user.id : null;
-  const cacheKey = parentId === undefined ? (viewerId ?? "anonymous") : null;
+  const cacheKey =
+    parentId === undefined
+      ? `${viewerId ?? "anonymous"}${topic ? `|topic:${topic}` : ""}`
+      : null;
   const [cached] = useState(() =>
     cacheKey === null ? undefined : feedCache.get(cacheKey),
   );
@@ -47,7 +52,8 @@ export function useFeed(
   const visibleLocalPosts = localPosts.filter(
     (entry) =>
       entry.post.author.id === viewerId &&
-      entry.post.parentId === (parentId ?? null),
+      entry.post.parentId === (parentId ?? null) &&
+      (!topic || entry.post.topics.includes(topic)),
   );
   const localIds = new Set(visibleLocalPosts.map((entry) => entry.post.id));
   const optimisticPostIds = visibleLocalPosts
@@ -60,7 +66,7 @@ export function useFeed(
       try {
         const page = parentId
           ? await api.replies(parentId, cursor, signal)
-          : await api.posts(cursor, signal);
+          : await api.posts(cursor, signal, topic);
         if (signal?.aborted) return;
         rememberPosts(page.posts, viewerId, startedAt);
         setFeedPosts((current) =>
@@ -95,7 +101,7 @@ export function useFeed(
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [parentId, viewerId],
+    [parentId, viewerId, topic],
   );
   useEffect(() => {
     if (cacheKey === null) return;

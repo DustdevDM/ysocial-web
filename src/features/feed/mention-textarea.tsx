@@ -97,9 +97,11 @@ export function MentionTextarea({
           onChange?.(event);
         }}
         aria-autocomplete="list"
-        aria-controls={users.length ? listId : undefined}
+        aria-controls={users.length ? listId : props["aria-controls"]}
         aria-activedescendant={
-          users.length ? `${listId}-${selected}` : undefined
+          users.length
+            ? `${listId}-${selected}`
+            : props["aria-activedescendant"]
         }
         onSelect={(event) => {
           setCaret(event.currentTarget.selectionStart);

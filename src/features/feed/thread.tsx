@@ -243,7 +243,11 @@ export function Thread({
             />
           </div>
           <div className="mt-4 mb-6">
-            <PostComposer feed={feed} placeholder="Write a reply…" />
+            <PostComposer
+              feed={feed}
+              placeholder="Write a reply…"
+              topics={false}
+            />
           </div>
           <h2 className="mb-1 text-base font-semibold">
             Replies
