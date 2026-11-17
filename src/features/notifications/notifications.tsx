@@ -42,6 +42,11 @@ const kinds = {
     text: "replied to your post",
     color: "bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400",
   },
+  mention: {
+    icon: MessageCircle,
+    text: "mentioned you in a post",
+    color: "bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400",
+  },
   follow: {
     icon: UserPlus,
     text: "followed you",

@@ -55,6 +55,7 @@ export function publishOptimistically({
     likes: 0,
     friendLikes: 0,
     friendLikers: [],
+    mentions: [],
     liked: false,
     reposts: 0,
     reposted: false,

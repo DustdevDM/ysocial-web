@@ -15,6 +15,11 @@ const userSchema = z.object({
   avatarUrl: z.string().nullable(),
 });
 const postSchema = z.object({
+  mentions: z
+    .array(
+      z.object({ id: z.string(), handle: z.string(), username: z.string() }),
+    )
+    .default([]),
   id: z.string(),
   parentId: z.string().nullable(),
   content: z.string(),
@@ -88,7 +93,7 @@ export type Session = z.infer<typeof sessionSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 const notificationSchema = z.object({
   id: z.string(),
-  kind: z.enum(["like", "repost", "reply", "follow"]),
+  kind: z.enum(["like", "repost", "reply", "follow", "mention"]),
   actor: userSchema,
   postId: z.string().nullable(),
   preview: z.string().nullable(),
@@ -532,6 +537,14 @@ export const api = {
         users: z.array(userSchema),
         nextCursor: z.string().nullable(),
       }),
+      "GET",
+      undefined,
+      signal,
+    ),
+  mentionSuggestions: (query: string, signal?: AbortSignal) =>
+    request(
+      `/api/profiles/suggestions?q=${encodeURIComponent(query)}`,
+      z.object({ users: z.array(userSchema).max(3) }),
       "GET",
       undefined,
       signal,

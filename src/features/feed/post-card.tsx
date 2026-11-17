@@ -5,7 +5,8 @@ import { Check, LoaderCircle, Pencil, Trash2, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { IconButton } from "@/components/ui/icon-button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "./mention-textarea";
+import { MentionText } from "./mention-text";
 import { PostActions } from "./post-actions";
 import { AvatarCircles } from "@/components/ui/avatar-circles";
 import { EditHistory } from "./edit-history";
@@ -245,7 +246,7 @@ export function PostCard({
               <label htmlFor={editorId} className="sr-only">
                 Edit post
               </label>
-              <Textarea
+              <MentionTextarea
                 id={editorId}
                 aria-describedby={editorHelpId}
                 aria-invalid={!length || length > 2000}
@@ -253,6 +254,7 @@ export function PostCard({
                 rows={3}
                 className="max-h-96 resize-y text-sm leading-relaxed"
                 value={content}
+                onValueChange={setContent}
                 disabled={busy}
                 onChange={(event) => setContent(event.target.value)}
                 onKeyDown={(event) => {
@@ -296,7 +298,7 @@ export function PostCard({
                 focused ? "text-base" : "text-sm",
               )}
             >
-              {post.content}
+              <MentionText post={post} />
             </p>
           )}
           <PostActions post={post} feed={feed} />
