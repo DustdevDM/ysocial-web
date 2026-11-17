@@ -37,7 +37,7 @@ export function ActionMenu({
   items,
 }: {
   trigger: ReactElement;
-  title: ReactNode;
+  title?: ReactNode;
   items: ActionMenuItem[];
 }) {
   const mobile = useIsMobile();
@@ -47,7 +47,7 @@ export function ActionMenu({
         <DrawerTrigger render={trigger} />
         <DrawerContent aria-describedby={undefined}>
           <DrawerHeader>
-            <DrawerTitle>{title}</DrawerTitle>
+            <DrawerTitle>{title ?? "Menu"}</DrawerTitle>
           </DrawerHeader>
           <div className="overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {items.map(({ icon: Icon, ...item }) => (
@@ -87,7 +87,7 @@ export function ActionMenu({
       <DropdownMenuTrigger render={trigger} />
       <DropdownMenuContent align="end" sideOffset={8} className="w-52">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>{title}</DropdownMenuLabel>
+          {title && <DropdownMenuLabel>{title}</DropdownMenuLabel>}
           {items.map(({ icon: Icon, ...item }) => (
             <div key={item.label}>
               {item.destructive && <DropdownMenuSeparator />}

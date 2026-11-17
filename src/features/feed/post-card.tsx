@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
+import { Link, useNavigate } from "react-router";
 import { formatDistance } from "date-fns";
 import { Check, LoaderCircle, Pencil, Trash2, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -7,6 +7,9 @@ import { IconButton } from "@/components/ui/icon-button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { PostActions } from "./post-actions";
+import { AvatarCircles } from "@/components/ui/avatar-circles";
+import { EditHistory } from "./edit-history";
+import { cn } from "@/lib/utils";
 import type { Post } from "@/lib/api";
 import type { FeedState } from "./use-feed";
 
@@ -14,11 +17,24 @@ export function PostCard({
   post,
   feed,
   connectToNext = false,
+  lineClassName,
+  connectFromPrev = false,
+  compact = false,
+  focused = false,
 }: {
   post: Post;
   feed: FeedState;
-  connectToNext?: boolean;
+  /** Draw the thread line below the avatar. "tight" stops at the card edge. */
+  connectToNext?: boolean | "tight";
+  lineClassName?: string;
+  /** A thread line arrives from the post above; draw it down to the avatar. */
+  connectFromPrev?: boolean;
+  /** Tighter padding, used for nested replies. */
+  compact?: boolean;
+  /** The post a thread page is about: not clickable, slightly larger text. */
+  focused?: boolean;
 }) {
+  const navigate = useNavigate();
   const editorId = useId();
   const editorHelpId = useId();
   const [editing, setEditing] = useState(false);
@@ -35,6 +51,32 @@ export function PostCard({
   const length = Array.from(content.trim()).length;
   const changed = content.trim() !== post.content.trim();
   const profilePath = `/@${post.author.handle}`;
+  const openable = !focused && !optimistic && !editing;
+  const openTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(openTimer.current), []);
+  function openPost(event: MouseEvent<HTMLElement>) {
+    window.clearTimeout(openTimer.current);
+    if (!openable || event.defaultPrevented || event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    // Portals (dialogs, tooltips) bubble through React but are not inside the card.
+    if (!event.currentTarget.contains(target)) return;
+    if (target.closest("a, button, input, textarea, label, [role='button']"))
+      return;
+    // Dragging to select ends in a click too; keep the selection.
+    if (window.getSelection()?.toString()) return;
+    const path = `/posts/${post.id}`;
+    if (event.metaKey || event.ctrlKey) {
+      window.open(path, "_blank");
+      return;
+    }
+    // Double and triple clicks select a word or line. Wait briefly on the
+    // text so the second click can cancel the navigation.
+    if (event.detail > 1) return;
+    const wait = target.closest("[data-selectable]") ? 220 : 0;
+    openTimer.current = window.setTimeout(() => {
+      if (!window.getSelection()?.toString()) void navigate(path);
+    }, wait);
+  }
   function closeEditor() {
     setContent(post.content);
     setEditing(false);
@@ -44,11 +86,36 @@ export function PostCard({
     if (feed.editPost(post, content)) setEditing(false);
   }
   return (
-    <article id={`post-${post.id}`} className="relative py-5">
+    <article
+      id={`post-${post.id}`}
+      onClick={openPost}
+      className={cn(
+        "relative animate-in fade-in-0 duration-300",
+        compact ? "py-3" : "py-5",
+        openable && "cursor-pointer",
+      )}
+    >
+      {connectFromPrev && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute top-0 left-4.25 w-0.5 bg-border",
+            compact ? "h-3" : "h-5",
+          )}
+        />
+      )}
       {connectToNext && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-4 left-4.25 top-15 w-0.5 rounded-full bg-border"
+          className={cn(
+            "pointer-events-none absolute left-4.25 w-0.5 rounded-t-full transition-colors",
+            lineClassName ?? "bg-border",
+            connectToNext === "tight"
+              ? "bottom-0 top-12"
+              : compact
+                ? "-bottom-2 top-12"
+                : "-bottom-4 top-15",
+          )}
         />
       )}
       <div className="flex items-start gap-3">
@@ -102,7 +169,7 @@ export function PostCard({
               </Link>
               <Link
                 to={`/posts/${post.id}`}
-                className="text-xs text-muted-foreground hover:underline"
+                className="text-xs text-muted-foreground"
                 aria-label="Open post"
                 aria-disabled={optimistic || undefined}
                 tabIndex={optimistic ? -1 : undefined}
@@ -120,16 +187,11 @@ export function PostCard({
                 </time>
               </Link>
               {post.editedAt && (
-                <span
-                  className="text-xs text-muted-foreground"
-                  title={new Date(post.editedAt).toLocaleString()}
-                >
-                  edited
-                </span>
+                <EditHistory postId={post.id} editedAt={post.editedAt} />
               )}
             </div>
             {mine && (
-              <div className="-mt-1 flex shrink-0 gap-0.5">
+              <div className="-my-1.5 flex shrink-0 gap-0.5">
                 {editing ? (
                   <>
                     <IconButton
@@ -227,11 +289,30 @@ export function PostCard({
               </div>
             </div>
           ) : (
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">
+            <p
+              data-selectable
+              className={cn(
+                "mt-2 whitespace-pre-wrap break-words leading-relaxed",
+                focused ? "text-base" : "text-sm",
+              )}
+            >
               {post.content}
             </p>
           )}
           <PostActions post={post} feed={feed} />
+          {post.friendLikes > 0 && (
+            <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+              <AvatarCircles
+                size="sm"
+                people={post.friendLikers}
+                extra={Math.max(0, post.friendLikes - post.friendLikers.length)}
+              />
+              <span>
+                {post.friendLikes.toLocaleString()}{" "}
+                {post.friendLikes === 1 ? "friend" : "friends"} liked this post
+              </span>
+            </div>
+          )}
         </div>
       </div>
       <ConfirmationDialog

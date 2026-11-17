@@ -27,6 +27,9 @@ const postSchema = z.object({
   replies: z.number(),
   reposts: z.number(),
   reposted: z.boolean(),
+  // Mutual follows who liked this post: how many, and the first few.
+  friendLikes: z.number().default(0),
+  friendLikers: z.array(userSchema).default([]),
 });
 const pageSchema = z.object({
   posts: z.array(postSchema),
@@ -35,6 +38,13 @@ const pageSchema = z.object({
 });
 const postResponseSchema = z.object({
   post: postSchema,
+  serverNow: z.string(),
+});
+const threadSchema = z.object({
+  post: postSchema,
+  ancestors: z.array(postSchema),
+  replies: z.array(postSchema),
+  truncated: z.boolean(),
   serverNow: z.string(),
 });
 const sessionSchema = z.union([
@@ -92,11 +102,81 @@ const notificationsSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+const traceCodes: Record<string, number> = {
+  // auth
+  invalid_origin: 1001,
+  sign_in_required: 1002,
+  onboarding_required: 1003,
+  account_deleted: 1004,
+  already_onboarded: 1005,
+  invalid_login_state: 1006,
+  invalid_provider_identity: 1007,
+  login_not_configured: 1008,
+  provider_unavailable: 1009,
+  // post
+  post_not_found: 2001,
+  not_post_author: 2002,
+  edit_window_expired: 2003,
+  invalid_content: 2004,
+  invalid_post_id: 2005,
+  post_id_conflict: 2006,
+  // profile
+  profile_not_found: 3001,
+  invalid_profile: 3002,
+  invalid_handle: 3003,
+  cannot_follow_self: 3004,
+  // paging/inbox/push
+  invalid_cursor: 4001,
+  invalid_activity_type: 4002,
+  invalid_notification_id: 4003,
+  invalid_notification_range: 4004,
+  invalid_mute: 4005,
+  push_not_configured: 4006,
+  // media
+  invalid_avatar: 5001,
+  avatar_png_required: 5002,
+  avatar_not_found: 5003,
+  avatar_storage_not_configured: 5004,
+  avatar_storage_unavailable: 5005,
+  invalid_banner: 5006,
+  invalid_banner_crop: 5007,
+  banner_not_found: 5008,
+  // gif
+  invalid_gif_selection: 6001,
+  invalid_search: 6002,
+  gif_search_limit: 6003,
+  gif_search_unavailable: 6004,
+  klipy_not_configured: 6005,
+  // api
+  route_not_found: 7001,
+  unexpected_response: 7002,
+};
+
 export class ApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** "METHOD /path" of the failed request, for tracing. */
+  readonly endpoint?: string;
+  constructor(status: number, message: string, endpoint?: string) {
     super(message);
     this.status = status;
+    this.endpoint = endpoint;
+  }
+  /**
+   * Numeric code shown to people next to the message so a report can be traced
+   * to the exact cause, e.g. YS-1001. Known API errors have a fixed number
+   * (see traceCodes: 1xxx auth, 2xxx posts, 3xxx profiles, 4xxx paging/inbox/
+   * push, 5xxx media, 6xxx GIFs, 7xxx API plumbing). Unlisted errors get a
+   * stable 9xxx number derived from the API's error text. YS-0001 means the
+   * server was never reached.
+   */
+  get traceCode() {
+    if (this.status === 0) return "YS-0001";
+    const known = traceCodes[this.message];
+    if (known) return `YS-${known}`;
+    let hash = 0;
+    for (const char of `${this.status}:${this.message}`)
+      hash = (hash * 31 + char.charCodeAt(0)) % 1000;
+    return `YS-${9000 + hash}`;
   }
 }
 
@@ -155,7 +235,7 @@ export async function retryRequest<T>(
     finishRetry?.();
   }
 }
-export function errorMessage(error: unknown) {
+function friendlyMessage(error: unknown) {
   if (error instanceof ApiError) {
     if (error.status === 401)
       return "Your session expired. Sign in to continue.";
@@ -198,9 +278,30 @@ export function errorMessage(error: unknown) {
       return error.message === "already_onboarded"
         ? "Your account is already set up. Reload to continue."
         : "That handle is taken. Choose another.";
-    return `Request failed: ${error.message}`;
+    if (error.status === 0)
+      return "You seem to be offline. Check your connection and try again.";
+    if (error.status === 403) return "You don't have permission to do that.";
+    if (error.status === 404) return "We couldn't find what you were looking for.";
+    if (error.status === 429)
+      return "Too many requests. Wait a moment, then try again.";
+    if (error.status >= 500)
+      return "Something went wrong on our side. Please try again in a moment.";
+    return "Something went wrong. Please try again.";
   }
-  return "Unable to reach the API. Please try again.";
+  if (error instanceof z.ZodError)
+    return "We got an unexpected answer from the server. Please try again.";
+  return "Something went wrong. Please try again.";
+}
+/** User-facing text for any failure, ending in a trace code developers can search for. */
+export function errorMessage(error: unknown) {
+  const message = friendlyMessage(error);
+  const code =
+    error instanceof ApiError
+      ? error.traceCode
+      : error instanceof z.ZodError
+        ? "YS-0002"
+        : "YS-0003";
+  return `${message} (${code})`;
 }
 async function sendRequest<T>(
   path: string,
@@ -239,10 +340,15 @@ async function sendRequest<T>(
     const parsed = z
       .object({ error: z.string() })
       .safeParse(await response.json().catch(() => null));
-    throw new ApiError(
+    const error = new ApiError(
       response.status,
-      parsed.success ? parsed.data.error : response.statusText,
+      // A body that is not our JSON error shape means a proxy or an
+      // unexpected route answered, not the API itself.
+      parsed.success ? parsed.data.error : "unexpected_response",
+      `${method} ${path}`,
     );
+    console.error(`[ysocial] ${error.traceCode}`, error.endpoint);
+    throw error;
   }
   return schema.parse(
     response.status === 204 ? undefined : await response.json(),
@@ -399,6 +505,18 @@ export const api = {
     ),
   post: (id: string, signal?: AbortSignal) =>
     request(postPath(id), postResponseSchema, "GET", undefined, signal),
+  thread: (id: string, signal?: AbortSignal) =>
+    request(`${postPath(id)}/thread`, threadSchema, "GET", undefined, signal),
+  postEdits: (id: string, signal?: AbortSignal) =>
+    request(
+      `${postPath(id)}/edits`,
+      z.object({
+        versions: z.array(z.object({ content: z.string(), at: z.string() })),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
   postActivity: (
     id: string,
     type: "likes" | "reposts",

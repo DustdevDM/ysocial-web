@@ -178,14 +178,30 @@ function NotificationsContent({ onNavigate }: { onNavigate?: () => void }) {
             </Button>
           </div>
         )}
-        {nextCursor && !error && (
+        {nextCursor && !error && loading && items.length > 0 && (
+          <div
+            className="space-y-5 p-4"
+            role="status"
+            aria-label="Loading more notifications"
+          >
+            {[0, 1].map((i) => (
+              <div key={i} className="flex gap-3">
+                <Skeleton className="size-10 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {nextCursor && !error && !loading && (
           <Button
             variant="ghost"
             className="my-2 w-full"
-            disabled={loading}
             onClick={() => void refresh(nextCursor)}
           >
-            {loading ? "Loading…" : "Load more"}
+            Load more
           </Button>
         )}
       </div>

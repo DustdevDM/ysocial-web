@@ -2,6 +2,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   Drawer,
   DrawerClose,
@@ -26,7 +27,7 @@ export function ThemeSelector() {
         <span>Theme</span>
         <Drawer showSwipeHandle>
           <DrawerTrigger
-            render={<Button variant="outline" className="min-h-11" />}
+            render={<Button variant="outline" />}
             aria-label="Choose theme"
           >
             {themes.find((option) => option.value === theme)?.label}
@@ -62,8 +63,7 @@ export function ThemeSelector() {
   return (
     <label className="flex items-center gap-2">
       Theme
-      <select
-        className="border bg-background p-1"
+      <NativeSelect
         value={theme}
         onChange={(event) => {
           const value = event.target.value;
@@ -76,7 +76,7 @@ export function ThemeSelector() {
             {label}
           </option>
         ))}
-      </select>
+      </NativeSelect>
     </label>
   );
 }

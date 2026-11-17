@@ -13,15 +13,13 @@ import {
   CalendarDays,
   Camera,
   Pencil,
-  FileText,
   UserCheck,
   UserPlus,
   UsersRound,
-  MessageCircle,
-  Repeat2,
   RotateCcw,
 } from "lucide-react";
 import { IconButton, IconLink } from "@/components/ui/icon-button";
+import { useGoBack } from "@/hooks/use-go-back";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -161,6 +159,7 @@ export function ProfilePage({
     void load(controller.signal);
     return () => controller.abort();
   }, [load, session]);
+  const goBack = useGoBack();
   usePageTitle(
     loadedProfile
       ? `${loadedProfile.profile.displayName} (@${loadedProfile.profile.handle})`
@@ -169,7 +168,7 @@ export function ProfilePage({
   return (
     <div className="mx-auto min-w-0 max-w-xl">
       <header className="mb-4 flex items-center gap-3">
-        <IconLink to="/" label="Back to feed">
+        <IconLink to="/" label="Back" onClick={goBack}>
           <ArrowLeft />
         </IconLink>
         <span className="text-lg font-semibold">Profile</span>
@@ -364,20 +363,29 @@ export function ProfilePage({
                   onClick={() => void toggleFollow()}
                 >
                   {friends ? (
-                    <>
+                    <span
+                      key="friends"
+                      className="inline-flex animate-in items-center gap-1.5 duration-200 fade-in-0 zoom-in-90"
+                    >
                       <UsersRound />
                       <span>Friends</span>
-                    </>
+                    </span>
                   ) : profile.isFollowing ? (
-                    <>
+                    <span
+                      key="following"
+                      className="inline-flex animate-in items-center gap-1.5 duration-200 fade-in-0 zoom-in-90"
+                    >
                       <UserCheck />
                       <span>Unfollow</span>
-                    </>
+                    </span>
                   ) : (
-                    <>
+                    <span
+                      key="follow"
+                      className="inline-flex animate-in items-center gap-1.5 duration-200 fade-in-0 zoom-in-90"
+                    >
                       <UserPlus />
                       <span>Follow</span>
-                    </>
+                    </span>
                   )}
                 </IconButton>
               ) : session.authenticated ? (
@@ -428,27 +436,38 @@ export function ProfilePage({
             })}
           </p>
           <div
-            className="flex gap-2 border-b pb-3"
+            role="tablist"
             aria-label="Profile sections"
+            className="relative -mx-1 flex border-b"
           >
             {(
               [
-                { value: "posts", label: "Posts", icon: FileText },
-                { value: "replies", label: "Replies", icon: MessageCircle },
-                { value: "reposts", label: "Reposts", icon: Repeat2 },
+                { value: "posts", label: "Posts" },
+                { value: "replies", label: "Replies" },
+                { value: "reposts", label: "Reposts" },
               ] as const
-            ).map(({ value, label, icon: Icon }) => (
-              <Button
+            ).map(({ value, label }) => (
+              <button
                 key={value}
-                variant={tab === value ? "secondary" : "ghost"}
-                className="flex-1"
-                aria-pressed={tab === value}
+                type="button"
+                role="tab"
+                aria-selected={tab === value}
                 onClick={() => setTab(value)}
+                className="h-11 flex-1 text-sm font-medium text-muted-foreground outline-none transition-[color,transform] duration-200 hover:text-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 active:scale-95 aria-selected:font-semibold aria-selected:text-foreground"
               >
-                <Icon aria-hidden="true" />
                 {label}
-              </Button>
+              </button>
             ))}
+            {/* One underline that glides to the selected tab. */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-0 left-0 h-0.5 w-1/3 px-3 transition-transform duration-300 ease-[cubic-bezier(0.65,0,0.35,1)]"
+              style={{
+                transform: `translateX(${["posts", "replies", "reposts"].indexOf(tab) * 100}%)`,
+              }}
+            >
+              <span className="block h-full rounded-full bg-foreground" />
+            </span>
           </div>
           {feed.error && <p role="alert">{feed.error}</p>}
           {tab === "replies"

@@ -53,6 +53,8 @@ export function publishOptimistically({
     editedAt: null,
     editExpiresAt: new Date(now.getTime() + 15 * 60_000).toISOString(),
     likes: 0,
+    friendLikes: 0,
+    friendLikers: [],
     liked: false,
     reposts: 0,
     reposted: false,
