@@ -37,7 +37,9 @@ export function publishOptimistically({
   author,
   parentId,
   onConfirmed,
+  attachments = [],
 }: {
+  attachments?: Post["attachments"];
   content: string;
   author: Post["author"];
   parentId: string | null;
@@ -47,6 +49,7 @@ export function publishOptimistically({
   const optimistic: Post = {
     id: crypto.randomUUID(),
     content,
+    attachments,
     author,
     parentId,
     createdAt: now.toISOString(),
@@ -55,6 +58,7 @@ export function publishOptimistically({
     likes: 0,
     friendLikes: 0,
     friendLikers: [],
+    mentions: [],
     liked: false,
     reposts: 0,
     reposted: false,
@@ -84,8 +88,17 @@ export function publishOptimistically({
       const { post } = await retryRequest(
         () =>
           parentId
-            ? api.reply(parentId, content, optimistic.id)
-            : api.publish(content, optimistic.id),
+            ? api.reply(
+                parentId,
+                content,
+                optimistic.id,
+                attachments.map((a) => a.id),
+              )
+            : api.publish(
+                content,
+                optimistic.id,
+                attachments.map((a) => a.id),
+              ),
         {
           context: parentId ? "publish reply" : "publish post",
           beforeRetry: verifyAccount,

@@ -12,7 +12,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "./mention-textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -187,13 +187,15 @@ function AuthenticatedPostComposer({
             {draft || " "}
             {"\u200b"}
           </div>
-          <Textarea
+          <MentionTextarea
             ref={textarea}
             aria-label={placeholder.replace("…", "")}
             aria-describedby={helpId}
             placeholder={placeholder}
             rows={1}
             value={draft}
+            onValueChange={setDraft}
+            wrapperClassName="relative h-full"
             disabled={!feed.canPost}
             onChange={(event) => {
               setPublished(false);
