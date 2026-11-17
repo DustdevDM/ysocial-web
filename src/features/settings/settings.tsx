@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { Link } from "react-router";
-import { useTheme } from "@/components/theme-provider";
+import { ThemeSelector } from "./theme-selector";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -32,27 +32,11 @@ type SettingsUser = Extract<Session, { needsOnboarding: false }>["user"];
 
 export function SettingsPage({ auth }: { auth: AuthState }) {
   usePageTitle("Settings");
-  const { theme, setTheme } = useTheme();
   const session = auth.session;
   return (
     <div className="max-w-md space-y-3 text-sm">
       <h1>Settings</h1>
-      <label className="flex items-center gap-2">
-        Theme
-        <select
-          className="border bg-background p-1"
-          value={theme}
-          onChange={(event) => {
-            const value = event.target.value;
-            if (value === "light" || value === "dark" || value === "system")
-              setTheme(value);
-          }}
-        >
-          <option value="system">System</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select>
-      </label>
+      <ThemeSelector />
       {session === null ? (
         <p role="status">Loading account…</p>
       ) : session.authenticated && !session.needsOnboarding ? (

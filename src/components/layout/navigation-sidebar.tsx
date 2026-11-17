@@ -11,7 +11,7 @@ export function NavigationSidebar() {
   return (
     <aside
       aria-label="Sidebar"
-      className="flex min-h-0 min-w-0 flex-col overflow-y-auto p-2 lg:p-3"
+      className="hidden min-h-0 min-w-0 flex-col overflow-y-auto p-2 md:flex lg:p-3"
     >
       <div className="flex flex-col items-start gap-4">
         <Link
