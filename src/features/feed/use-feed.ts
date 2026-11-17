@@ -148,6 +148,7 @@ export function useFeed(
     canPost,
     pending: optimisticPostIds,
     sharePost,
+    refresh: () => load(),
     loadMore: nextCursor
       ? () => {
           setLoading(true);
