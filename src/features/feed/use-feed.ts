@@ -28,7 +28,7 @@ export function useFeed(
   parentId?: string,
   autoLoad = true,
   onPublished?: () => void,
-  /** Only top-level posts with this (normalized) topic. */
+  /** Only posts and replies with this normalized topic. */
   topic?: string,
 ) {
   const viewerId =
@@ -52,8 +52,9 @@ export function useFeed(
   const visibleLocalPosts = localPosts.filter(
     (entry) =>
       entry.post.author.id === viewerId &&
-      entry.post.parentId === (parentId ?? null) &&
-      (!topic || entry.post.topics.includes(topic)),
+      (topic
+        ? entry.post.topics.includes(topic)
+        : entry.post.parentId === (parentId ?? null)),
   );
   const localIds = new Set(visibleLocalPosts.map((entry) => entry.post.id));
   const optimisticPostIds = visibleLocalPosts
@@ -169,7 +170,8 @@ export function useFeed(
       ...feedPosts.filter((post) => !localIds.has(post.id)),
     ]
       .map((post) => projectPost(post, viewerId))
-      .filter((post) => post !== null),
+      .filter((post) => post !== null)
+      .filter((post) => !topic || post.topics.includes(topic)),
     resolvePost: (post: Post) => projectPost(post, viewerId),
     viewerReposts: viewerId ? cachedReposts(viewerId) : [],
     optimisticPostIds,

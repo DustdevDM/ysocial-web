@@ -26,7 +26,7 @@ export function subscribeToLocalPosts(listener: () => void) {
     listeners.delete(listener);
   };
 }
-/** Called after a new top-level post was saved, e.g. to refresh trending topics. */
+/** Called after a top-level post or a tagged reply is saved. */
 export function subscribeToPublished(listener: () => void) {
   publishedListeners.add(listener);
   return () => {
@@ -70,7 +70,7 @@ export function publishOptimistically({
     reposted: false,
     replies: 0,
     // Replies are never tagged; the API confirms the same topics for posts.
-    topics: parentId ? [] : extractTopics(content),
+    topics: extractTopics(content),
   };
   let failedToastId: string | undefined;
   async function send(retry = false): Promise<boolean> {
@@ -132,7 +132,9 @@ export function publishOptimistically({
     } finally {
       inFlight.delete(optimistic.id);
     }
-    if (!parentId) for (const listener of publishedListeners) listener();
+    if (!parentId || optimistic.topics.length) {
+      for (const listener of publishedListeners) listener();
+    }
     onConfirmed?.();
     return true;
   }

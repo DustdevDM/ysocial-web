@@ -33,7 +33,7 @@ export function PostComposer({
 }: {
   feed: FeedState;
   placeholder?: string;
-  /** Offer #topic completion. Only posts have topics, replies do not. */
+  /** Offer #topic completion. */
   topics?: boolean;
 }) {
   if (!feed.sessionLoading && !feed.authenticated) {
