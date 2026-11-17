@@ -16,21 +16,34 @@ import {
 } from "./optimistic-actions";
 import { toast } from "@/components/ui/toast-manager";
 
+// Home-feed pages survive navigation, so coming back from a post shows the same
+// list instantly (and can restore the scroll position) while it revalidates.
+const feedCache = new Map<
+  string,
+  { posts: Post[]; nextCursor: string | null }
+>();
+
 export function useFeed(
   session: Session | null,
   parentId?: string,
   autoLoad = true,
   onPublished?: () => void,
 ) {
-  const [feedPosts, setFeedPosts] = useState<Post[]>([]);
+  const viewerId =
+    session?.authenticated && !session.needsOnboarding ? session.user.id : null;
+  const cacheKey = parentId === undefined ? (viewerId ?? "anonymous") : null;
+  const [cached] = useState(() =>
+    cacheKey === null ? undefined : feedCache.get(cacheKey),
+  );
+  const [feedPosts, setFeedPosts] = useState<Post[]>(cached?.posts ?? []);
   const [draft, setDraft] = useState("");
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(
+    cached?.nextCursor ?? null,
+  );
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState("");
   useSyncExternalStore(subscribeToActions, getActionRevision);
   const localPosts = useSyncExternalStore(subscribeToLocalPosts, getLocalPosts);
-  const viewerId =
-    session?.authenticated && !session.needsOnboarding ? session.user.id : null;
   const visibleLocalPosts = localPosts.filter(
     (entry) =>
       entry.post.author.id === viewerId &&
@@ -42,7 +55,7 @@ export function useFeed(
     .map((entry) => entry.post.id);
   const canPost = !!session?.authenticated && !session.needsOnboarding;
   const load = useCallback(
-    async (cursor?: string, signal?: AbortSignal) => {
+    async (cursor?: string, signal?: AbortSignal, revalidate = false) => {
       const startedAt = getActionRevision();
       try {
         const page = parentId
@@ -51,18 +64,30 @@ export function useFeed(
         if (signal?.aborted) return;
         rememberPosts(page.posts, viewerId, startedAt);
         setFeedPosts((current) =>
-          cursor
+          revalidate
             ? [
-                ...current,
                 ...page.posts.filter(
                   (post) =>
                     !current.some((existing) => existing.id === post.id),
                 ),
+                ...current.map(
+                  (existing) =>
+                    page.posts.find((post) => post.id === existing.id) ??
+                    existing,
+                ),
               ]
-            : page.posts,
+            : cursor
+              ? [
+                  ...current,
+                  ...page.posts.filter(
+                    (post) =>
+                      !current.some((existing) => existing.id === post.id),
+                  ),
+                ]
+              : page.posts,
         );
         acknowledgePosts(page.posts);
-        setNextCursor(page.nextCursor);
+        if (!revalidate) setNextCursor(page.nextCursor);
         setError("");
       } catch (error) {
         if (!signal?.aborted) setError(errorMessage(error));
@@ -73,15 +98,19 @@ export function useFeed(
     [parentId, viewerId],
   );
   useEffect(() => {
+    if (cacheKey === null) return;
+    feedCache.set(cacheKey, { posts: feedPosts, nextCursor });
+  }, [cacheKey, feedPosts, nextCursor]);
+  useEffect(() => {
     if (!autoLoad) return;
     const controller = new AbortController();
     // HTTP completes asynchronously; cleanup cancels stale responses.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load(undefined, controller.signal);
+    void load(undefined, controller.signal, !!cached);
     return () => controller.abort();
-  }, [load, session, autoLoad]);
-  function publishPost() {
-    const content = draft.trim();
+  }, [load, session, autoLoad, cached]);
+  function publishPost(text: string = draft) {
+    const content = text.trim();
     if (
       !session?.authenticated ||
       session.needsOnboarding ||

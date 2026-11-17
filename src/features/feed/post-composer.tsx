@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { ArrowUp, Check, Construction, Plus } from "lucide-react";
+import { ArrowUp, Construction, Plus } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,9 +13,20 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { FeedState } from "./use-feed";
 
-export function PostComposer({ feed }: { feed: FeedState }) {
+export function PostComposer({
+  feed,
+  placeholder = "What's on your mind?",
+}: {
+  feed: FeedState;
+  placeholder?: string;
+}) {
   if (!feed.sessionLoading && !feed.authenticated) {
     return (
       <Dialog>
@@ -27,7 +38,7 @@ export function PostComposer({ feed }: { feed: FeedState }) {
             />
           }
         >
-          What's on your mind?
+          {placeholder}
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
@@ -46,65 +57,97 @@ export function PostComposer({ feed }: { feed: FeedState }) {
       </Dialog>
     );
   }
-  return <AuthenticatedPostComposer feed={feed} />;
+  return <AuthenticatedPostComposer feed={feed} placeholder={placeholder} />;
 }
 
-function AuthenticatedPostComposer({ feed }: { feed: FeedState }) {
-  const [focused, setFocused] = useState(false);
-  const [published, setPublished] = useState(false);
-  const [submittedLength, setSubmittedLength] = useState(0);
-  const [attachmentsOpen, setAttachmentsOpen] = useState(false);
-  const textarea = useRef<HTMLTextAreaElement>(null);
-  const helpId = useId();
-  const length = Array.from(feed.draft.trim()).length;
-  const expanded = focused || feed.draft.length > 0 || attachmentsOpen;
-  const closing = published && !expanded;
-  const displayedLength = closing ? submittedLength : length;
-  const nearLimit = displayedLength >= 1800;
-  const valid = feed.canPost && length > 0 && length <= 2000;
+const LIMIT = 2000;
+// The ring only shows up once the end is in sight.
+const RING_FROM = 1600;
+const MAX_HEIGHT = 240;
 
+/** A small ring that fills and shifts from yellow to red as the limit nears. */
+function LimitRing({ length }: { length: number }) {
+  const progress = Math.min(
+    1,
+    Math.max(0, (length - RING_FROM) / (LIMIT - RING_FROM)),
+  );
+  const radius = 8;
+  const circumference = 2 * Math.PI * radius;
+  const hue = 95 - 70 * progress;
+  const visible = length >= RING_FROM;
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            className={`flex size-6 shrink-0 items-center justify-center transition-opacity duration-200 ${visible ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          />
+        }
+      >
+        <svg
+          viewBox="0 0 20 20"
+          className="size-5 -rotate-90"
+          aria-hidden="true"
+        >
+          <circle
+            cx="10"
+            cy="10"
+            r={radius}
+            fill="none"
+            strokeWidth="2.5"
+            className="stroke-foreground/15"
+          />
+          <circle
+            cx="10"
+            cy="10"
+            r={radius}
+            fill="none"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference * (1 - progress)}
+            style={{ stroke: `oklch(0.8 0.19 ${hue})` }}
+            className="transition-[stroke-dashoffset,stroke] duration-150"
+          />
+        </svg>
+      </TooltipTrigger>
+      <TooltipContent>
+        {length.toLocaleString()} / {LIMIT.toLocaleString()}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function AuthenticatedPostComposer({
+  feed,
+  placeholder,
+}: {
+  feed: FeedState;
+  placeholder: string;
+}) {
+  const [published, setPublished] = useState(false);
+  const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  // Kept here, not in the feed state: typing must not re-render every post.
+  const [draft, setDraft] = useState("");
+  const [height, setHeight] = useState<number>();
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const mirror = useRef<HTMLDivElement>(null);
+  const helpId = useId();
+  const length = Array.from(draft.trim()).length;
+  const empty = length === 0;
+  const valid = feed.canPost && !empty && length <= LIMIT;
+
+  // A hidden copy of the text measures how tall the field needs to be, so the
+  // visible one can animate between heights (field-sizing cannot transition).
   useLayoutEffect(() => {
-    const input = textarea.current;
-    if (!input) return;
-    // Measure natural content separately so clearing the draft cannot snap the
-    // visible textarea's height before its closing transition runs.
-    function resize() {
-      if (!input) return;
-      const styles = getComputedStyle(input);
-      const mirror = document.createElement("textarea");
-      mirror.className = input.className;
-      mirror.value = input.value;
-      mirror.tabIndex = -1;
-      mirror.setAttribute("aria-hidden", "true");
-      mirror.style.cssText =
-        "position:absolute;visibility:hidden;pointer-events:none;height:0;min-height:0;max-height:none;transition:none;";
-      mirror.style.width = `${input.getBoundingClientRect().width}px`;
-      input.parentElement?.append(mirror);
-      const collapsedHeight =
-        parseFloat(styles.lineHeight) +
-        parseFloat(styles.paddingTop) +
-        parseFloat(styles.paddingBottom);
-      const height = expanded
-        ? Math.min(
-            parseFloat(styles.maxHeight),
-            Math.max(96, mirror.scrollHeight),
-          )
-        : collapsedHeight;
-      mirror.remove();
-      input.style.height = `${height}px`;
-    }
-    resize();
-    let width = input.getBoundingClientRect().width;
-    const observer = new ResizeObserver(() => {
-      const nextWidth = input.getBoundingClientRect().width;
-      if (nextWidth !== width) {
-        width = nextWidth;
-        resize();
-      }
-    });
-    observer.observe(input);
+    const copy = mirror.current;
+    if (!copy) return;
+    const update = () => setHeight(copy.offsetHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(copy);
     return () => observer.disconnect();
-  }, [expanded, feed.draft]);
+  }, []);
 
   useEffect(() => {
     if (!published) return;
@@ -114,42 +157,47 @@ function AuthenticatedPostComposer({ feed }: { feed: FeedState }) {
 
   function publish() {
     if (!valid) return;
-    const sending = feed.publishPost();
-    if (!sending) return;
+    if (!feed.publishPost(draft)) return;
+    setDraft("");
     textarea.current?.blur();
-    setFocused(false);
-    setSubmittedLength(length);
     setPublished(true);
   }
 
+  const textClass = "py-1.5 text-sm leading-6 md:text-base";
   return (
     <Dialog open={attachmentsOpen} onOpenChange={setAttachmentsOpen}>
+      {/* Equal 8px padding above, below and right of the buttons (36px). */}
       <form
-        className={`mx-auto w-full max-w-xl rounded-[1.75rem] bg-muted px-4 py-2 transition-shadow duration-[420ms] ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none sm:px-5 ${expanded ? "ring-1 ring-border" : ""}`}
+        className="mx-auto flex w-full max-w-xl items-end gap-2 rounded-[1.75rem] bg-muted p-2 pl-4 transition-shadow focus-within:ring-1 focus-within:ring-border sm:pl-5"
         aria-label="Post composer"
         onSubmit={(event) => {
           event.preventDefault();
-          void publish();
-        }}
-        onFocusCapture={() => setFocused(true)}
-        onBlurCapture={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget))
-            setFocused(false);
+          publish();
         }}
       >
-        <div className="relative flex items-center gap-2">
+        <div
+          className="relative min-w-0 flex-1 transition-[height] duration-200 ease-out"
+          style={{ height: height ? Math.min(height, MAX_HEIGHT) : undefined }}
+        >
+          <div
+            ref={mirror}
+            aria-hidden="true"
+            className={`pointer-events-none invisible absolute inset-x-0 top-0 min-h-9 break-words whitespace-pre-wrap ${textClass}`}
+          >
+            {draft || " "}
+            {"\u200b"}
+          </div>
           <Textarea
             ref={textarea}
-            aria-label="Write a post"
+            aria-label={placeholder.replace("…", "")}
             aria-describedby={helpId}
-            aria-invalid={length > 2000}
-            placeholder="What's on your mind?"
+            placeholder={placeholder}
             rows={1}
-            value={feed.draft}
+            value={draft}
             disabled={!feed.canPost}
             onChange={(event) => {
               setPublished(false);
-              feed.setDraft(event.target.value);
+              setDraft(event.target.value);
             }}
             onKeyDown={(event) => {
               if (
@@ -158,68 +206,47 @@ function AuthenticatedPostComposer({ feed }: { feed: FeedState }) {
                 !event.nativeEvent.isComposing
               ) {
                 event.preventDefault();
-                if (!event.repeat) void publish();
+                if (!event.repeat) publish();
               }
-              if (event.key === "Escape" && !feed.draft) {
+              if (event.key === "Escape" && !draft) {
                 event.currentTarget.blur();
               }
             }}
-            className="h-10 max-h-60 min-h-0 min-w-0 flex-1 resize-none field-sizing-fixed rounded-none border-0 bg-transparent py-2 pl-0 pr-6 text-left text-sm shadow-none transition-[height] duration-[420ms] ease-[cubic-bezier(0.65,0,0.35,1)] focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 motion-reduce:transition-none md:text-base dark:bg-transparent dark:disabled:bg-transparent"
-          />
-          <Check
-            className={`pointer-events-none absolute right-0 top-1/2 size-4 -translate-y-1/2 text-green-600 transition-opacity duration-300 ease-in-out motion-reduce:transition-none dark:text-green-400 ${published && !expanded ? "opacity-100" : "opacity-0"}`}
-            aria-hidden="true"
+            style={{
+              overflowY: (height ?? 0) > MAX_HEIGHT ? "auto" : "hidden",
+            }}
+            className={`absolute inset-0 h-full min-h-0 resize-none field-sizing-fixed rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 dark:bg-transparent dark:disabled:bg-transparent ${textClass}`}
           />
         </div>
-        <div
-          className={`grid transition-[grid-template-rows,opacity] duration-[420ms] ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none ${expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
-          inert={!expanded}
-        >
-          <div className="min-h-0 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 pb-1 pt-2">
-              <div className="flex items-center gap-2">
-                <DialogTrigger
-                  render={
-                    <IconButton
-                      label="Add attachment"
-                      type="button"
-                      className="text-muted-foreground"
-                    />
-                  }
-                >
-                  <Plus />
-                </DialogTrigger>
-              </div>
-              <div className="flex min-h-8 items-center gap-3">
-                {nearLimit && (
-                  <span
-                    className={`text-xs tabular-nums ${length > 2000 ? "text-destructive" : "text-muted-foreground"}`}
-                  >
-                    {displayedLength}/2000
-                  </span>
-                )}
-                <div
-                  inert={length === 0}
-                  className={`transition-opacity duration-[420ms] ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none ${length > 0 || closing ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                >
-                  <IconButton
-                    label="Publish post"
-                    type="submit"
-                    variant="default"
-                    className="rounded-[1.75rem]"
-                    disabled={!valid}
-                  >
-                    <ArrowUp />
-                  </IconButton>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <LimitRing length={length} />
+          <DialogTrigger
+            render={
+              <IconButton
+                label="Add attachment"
+                type="button"
+                className={`rounded-full text-muted-foreground transition-opacity ${empty ? "opacity-50" : ""}`}
+              />
+            }
+          >
+            <Plus />
+          </DialogTrigger>
+          <IconButton
+            label="Publish post"
+            type="submit"
+            variant="default"
+            className="rounded-full"
+            disabled={!valid}
+          >
+            <ArrowUp />
+          </IconButton>
         </div>
         <p id={helpId} className="sr-only">
           {feed.canPost
             ? "Enter adds a new line. Press Ctrl+Enter or Command+Enter to post. Maximum 2000 characters."
             : "Sign in and complete your profile to post or reply."}
+          {length >= RING_FROM &&
+            ` ${LIMIT - length >= 0 ? `${LIMIT - length} characters left.` : `${length - LIMIT} characters over the limit.`}`}
         </p>
         <p role="status" className="sr-only">
           {published ? "Post added" : ""}

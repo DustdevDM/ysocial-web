@@ -1,19 +1,23 @@
 import type { MouseEventHandler } from "react";
 import { Link, NavLink } from "react-router";
-import { CodeXml, FileText, Shield } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { navigation } from "./navigation";
+import { LegalMenu } from "./legal-menu";
+import { AccountMenu } from "@/features/auth/account-menu";
+import type { AuthState } from "@/features/auth/use-auth";
 import { NotificationsBell } from "@/features/notifications/notifications";
 
 export function NavigationSidebar({
-  showNotifications = false,
+  showAccount = false,
+  auth,
   onLogoClick,
 }: {
-  showNotifications?: boolean;
+  showAccount?: boolean;
+  auth?: AuthState;
   onLogoClick: MouseEventHandler<HTMLAnchorElement>;
 }) {
   return (
@@ -73,14 +77,14 @@ export function NavigationSidebar({
                       end={to === "/"}
                       aria-label={label}
                       className={({ isActive }) =>
-                        `flex h-10 w-full items-center gap-3 rounded-lg px-3 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring ${isActive ? "bg-muted font-bold text-foreground" : "font-medium text-muted-foreground"}`
+                        `group/nav flex h-10 w-full items-center gap-3 rounded-lg px-3 outline-none transition-[background-color,color,transform] duration-200 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97] ${isActive ? "bg-muted font-semibold text-foreground" : "font-medium text-muted-foreground hover:text-foreground"}`
                       }
                     >
                       {({ isActive }) => (
                         <>
                           <Icon
-                            className="size-5 shrink-0"
-                            strokeWidth={isActive ? 2.75 : 2}
+                            className="size-5 shrink-0 transition-transform duration-200 group-hover/nav:scale-110"
+                            strokeWidth={isActive ? 2.25 : 2}
                           />
                           <span className="hidden lg:inline">{label}</span>
                         </>
@@ -97,41 +101,19 @@ export function NavigationSidebar({
               </TooltipContent>
             </Tooltip>
           ))}
-          {showNotifications && <NotificationsBell className="ml-1" />}
         </nav>
       </div>
-      <nav
-        aria-label="Legal and project links"
-        className="mt-auto flex shrink-0 flex-col items-start gap-2 px-3 pt-6 pb-1 text-xs text-muted-foreground lg:flex-row lg:flex-wrap lg:gap-x-3"
-      >
-        {[
-          { label: "Privacy", to: "/legal/privacy", icon: Shield },
-          { label: "Terms", to: "/legal/terms", icon: FileText },
-          { label: "Imprint", to: "/legal/imprint", icon: FileText },
-          {
-            label: "Open Source",
-            to: "https://git.ysocial.cc/",
-            icon: CodeXml,
-          },
-        ].map(({ label, to, icon: Icon }) => (
-          <Tooltip key={to}>
-            <TooltipTrigger
-              render={
-                <Link
-                  to={to}
-                  className="rounded-sm outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <Icon aria-hidden="true" className="size-4 lg:hidden" />
-                  <span className="sr-only lg:not-sr-only">{label}</span>
-                </Link>
-              }
-            />
-            <TooltipContent side="right" className="lg:hidden">
-              {label}
-            </TooltipContent>
-          </Tooltip>
-        ))}
-      </nav>
+      {showAccount && auth && (
+        // Pages without the right-hand column keep the account controls here:
+        // avatar on the left, menu and bell on the right (stacked when narrow).
+        <div className="mt-auto flex shrink-0 flex-col items-center gap-1 pt-6 lg:flex-row lg:justify-between">
+          <AccountMenu auth={auth} />
+          <div className="flex flex-col items-center gap-1 lg:flex-row">
+            <LegalMenu />
+            <NotificationsBell className="size-9" />
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

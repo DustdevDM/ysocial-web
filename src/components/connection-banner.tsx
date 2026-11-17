@@ -18,7 +18,7 @@ export function ConnectionBanner() {
       role="status"
       aria-live="polite"
       aria-atomic="true"
-      className="shrink-0"
+      className="relative z-40 shrink-0"
     >
       {status !== "connected" && (
         <div className="flex items-center justify-center gap-2 border-b border-amber-500/25 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">

@@ -1,4 +1,10 @@
-import { useEffect, useRef, type MouseEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import {
   BrowserRouter,
   Link,
@@ -8,6 +14,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useNavigationType,
   useParams,
 } from "react-router";
 import { ArrowLeft, Construction, SearchX } from "lucide-react";
@@ -31,6 +38,8 @@ import { useFeed } from "@/features/feed/use-feed";
 import { ProfileSkeleton } from "@/components/loading-skeletons";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { cn } from "@/lib/utils";
+import { recallScroll, rememberScroll } from "@/lib/scroll-memory";
+import { useGoBack } from "@/hooks/use-go-back";
 import { SettingsPage } from "@/features/settings/settings";
 import { NotificationsProvider } from "@/features/notifications/notifications-context";
 import { NotificationsPage } from "@/features/notifications/notifications";
@@ -49,7 +58,9 @@ export function App() {
 
 function AppShell() {
   const auth = useAuth();
-  const centerScroll = useRef<HTMLElement>(null);
+  // State, not a ref: the section is recreated when the signed-in session
+  // arrives, and the scroll listeners must follow the live element.
+  const [scroller, setScroller] = useState<HTMLElement | null>(null);
   const logoClickCount = useRef(0);
   const navigate = useNavigate();
   const { pathname, key: navigationKey } = useLocation();
@@ -66,16 +77,53 @@ function AppShell() {
       navigate("/asettings");
     }
   }
+  const navigationType = useNavigationType();
+  const activeKey = useRef(navigationKey);
   useEffect(() => {
-    centerScroll.current?.scrollTo({
-      top: 0,
-      behavior:
-        pathname === "/" &&
-        !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "smooth"
-          : "instant",
+    if (!scroller) return;
+    const onScroll = () =>
+      rememberScroll(activeKey.current, scroller.scrollTop);
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => scroller.removeEventListener("scroll", onScroll);
+  }, [scroller]);
+  useLayoutEffect(() => {
+    if (!scroller) return;
+    activeKey.current = navigationKey;
+    const target =
+      navigationType === "POP" ? recallScroll(navigationKey) : undefined;
+    if (target === undefined) {
+      scroller.scrollTo({
+        top: 0,
+        behavior:
+          pathname === "/" &&
+          !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "smooth"
+            : "instant",
+      });
+      return;
+    }
+    // Content may still be loading: keep retrying until it is tall enough,
+    // and give up as soon as the user scrolls themselves.
+    let frame = 0;
+    let raf = 0;
+    const attempt = () => {
+      scroller.scrollTop = target;
+      if (Math.abs(scroller.scrollTop - target) < 2 || ++frame > 120) return;
+      raf = requestAnimationFrame(attempt);
+    };
+    const stop = () => cancelAnimationFrame(raf);
+    attempt();
+    scroller.addEventListener("wheel", stop, { once: true, passive: true });
+    scroller.addEventListener("touchstart", stop, {
+      once: true,
+      passive: true,
     });
-  }, [pathname, navigationKey]);
+    return () => {
+      stop();
+      scroller.removeEventListener("wheel", stop);
+      scroller.removeEventListener("touchstart", stop);
+    };
+  }, [scroller, pathname, navigationKey, navigationType]);
   return (
     <NotificationsProvider
       key={
@@ -89,7 +137,7 @@ function AppShell() {
           : null
       }
     >
-      <div className="flex h-dvh min-h-0 flex-col">
+      <div className="relative flex h-dvh min-h-0 flex-col">
         <MobileHeader auth={auth} onLogoClick={handleLogoClick} />
         <ConnectionBanner />
         <main
@@ -101,14 +149,15 @@ function AppShell() {
           )}
         >
           <NavigationSidebar
-            showNotifications={hideAccountSidebar}
+            showAccount={hideAccountSidebar}
+            auth={auth}
             onLogoClick={handleLogoClick}
           />
           <section
-            ref={centerScroll}
+            ref={setScroller}
             aria-label="Main content"
             tabIndex={0}
-            className="content-scroll min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] has-[[data-skeleton-scroll-lock]]:overflow-y-hidden sm:px-10 sm:pt-6 md:pb-6 lg:px-12"
+            className="content-scroll min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-4 max-md:pt-[calc(4.75rem+env(safe-area-inset-top))] pb-[calc(6.5rem+env(safe-area-inset-bottom))] has-[[data-skeleton-scroll-lock]]:overflow-y-hidden sm:px-10 sm:pt-6 md:pb-6 lg:px-12"
           >
             <Account auth={auth} />
             <Routes>
@@ -143,6 +192,11 @@ function AppShell() {
                 element={<ComingSoon title="Messages" />}
               />
               <Route path="/search" element={<ComingSoon title="Search" />} />
+              <Route path="/report" element={<ComingSoon title="Report" />} />
+              <Route
+                path="/bug"
+                element={<ComingSoon title="Report a bug" />}
+              />
               <Route
                 path="/legal/privacy"
                 element={<ComingSoon title="Privacy" />}
@@ -239,9 +293,10 @@ function ProfileRoute({
 }
 function ComingSoon({ title }: { title: string }) {
   usePageTitle(title);
+  const goBack = useGoBack();
   return (
     <div className="mx-auto max-w-xl">
-      <IconLink to="/" label="Back to feed">
+      <IconLink to="/" label="Back" onClick={goBack}>
         <ArrowLeft />
       </IconLink>
       <div className="flex flex-col items-center gap-3 py-16 text-center">

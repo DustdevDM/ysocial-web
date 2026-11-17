@@ -1,6 +1,8 @@
 import type { MouseEventHandler } from "react";
 import { House, Search, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
+import { LegalMenu } from "./legal-menu";
+import { ProgressiveBlur } from "@/components/ui/progressive-blur";
 import { AccountMenu } from "@/features/auth/account-menu";
 import type { AuthState } from "@/features/auth/use-auth";
 import { NotificationsBell } from "@/features/notifications/notifications";
@@ -16,29 +18,40 @@ export function MobileHeader({
 }) {
   const signedIn = auth.session?.authenticated && !auth.session.needsOnboarding;
 
+  // Exactly the header's height: the blur must not reach below it.
+  const headerHeight = "calc(env(safe-area-inset-top) + 4rem)";
   return (
-    <header className="shrink-0 border-b bg-background pt-[env(safe-area-inset-top)] md:hidden">
-      <div className="flex min-h-16 items-center justify-between gap-3 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))]">
-        <Link
-          to="/"
-          aria-label="ysocial home"
-          onClick={onLogoClick}
-          className="flex min-h-11 items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <img
-            src="/logo.png"
-            alt="ysocial"
-            width={1708}
-            height={644}
-            className="h-auto w-28"
-          />
-        </Link>
-        <div className="flex items-center gap-2">
-          {signedIn && <NotificationsBell className="size-11" />}
-          <AccountMenu auth={auth} />
+    <>
+      <ProgressiveBlur height={headerHeight} className="z-20 md:hidden" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-linear-to-b from-background/60 to-transparent md:hidden"
+        style={{ height: headerHeight }}
+      />
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-[env(safe-area-inset-top)] md:hidden">
+        <div className="pointer-events-auto relative flex min-h-16 items-center justify-between gap-3 pr-[max(1rem,env(safe-area-inset-right))] pl-[max(1rem,env(safe-area-inset-left))]">
+          <Link
+            to="/"
+            aria-label="ysocial home"
+            onClick={onLogoClick}
+            className="flex min-h-11 items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <img
+              src="/logo.png"
+              alt="ysocial"
+              width={1708}
+              height={644}
+              className="h-auto w-28"
+            />
+          </Link>
+          <div className="flex items-center gap-1">
+            <LegalMenu className="size-11" />
+            {signedIn && <NotificationsBell className="size-11" />}
+            <AccountMenu auth={auth} />
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
 
