@@ -127,11 +127,14 @@ const traceCodes: Record<string, number> = {
   cannot_follow_self: 3004,
   // paging/inbox/push
   invalid_cursor: 4001,
-  invalid_activity_type: 4002,
+  invalid_activity_query: 4002,
   invalid_notification_id: 4003,
-  invalid_notification_range: 4004,
-  invalid_mute: 4005,
+  invalid_notification_query: 4004,
+  invalid_push_mute: 4005,
   push_not_configured: 4006,
+  invalid_push_subscription: 4007,
+  notification_not_found: 4008,
+  push_subscription_not_found: 4009,
   // media
   invalid_avatar: 5001,
   avatar_png_required: 5002,
