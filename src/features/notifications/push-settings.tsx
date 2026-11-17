@@ -124,6 +124,7 @@ export function PushSettings() {
       setMutedUntil(result.mutedUntil);
       updateClock(Date.now());
       setState(duration === "off" ? "enabled" : "muted");
+      window.dispatchEvent(new Event("push-settings-updated"));
       setMuteOpen(false);
     } catch (reason) {
       setError(errorMessage(reason));
