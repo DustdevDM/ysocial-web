@@ -1,8 +1,8 @@
-import { Bell, House, Search, UserRound } from "lucide-react";
+import { House, Search, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { AccountMenu } from "@/features/auth/account-menu";
 import type { AuthState } from "@/features/auth/use-auth";
-import { IconLink } from "@/components/ui/icon-button";
+import { NotificationsBell } from "@/features/notifications/notifications";
 import { FloatingNavigation } from "@/components/ui/floating-navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -26,15 +26,7 @@ export function MobileHeader({ auth }: { auth: AuthState }) {
           />
         </Link>
         <div className="flex items-center gap-2">
-          {signedIn && (
-            <IconLink
-              to="/notifications"
-              label="Notifications"
-              className="size-11"
-            >
-              <Bell />
-            </IconLink>
-          )}
+          {signedIn && <NotificationsBell className="size-11" />}
           <AccountMenu auth={auth} />
         </div>
       </div>

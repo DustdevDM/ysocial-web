@@ -1,7 +1,6 @@
-import { Bell } from "lucide-react";
 import type { AuthState } from "@/features/auth/use-auth";
 import { AccountMenu } from "@/features/auth/account-menu";
-import { IconLink } from "@/components/ui/icon-button";
+import { NotificationsBell } from "@/features/notifications/notifications";
 import { ProfileCard } from "@/components/account/profile-card";
 import { TrendingTopics } from "@/components/account/trending-topics";
 
@@ -23,15 +22,7 @@ export function AccountSidebar({ auth }: { auth: AuthState }) {
       {session !== null && (
         <>
           <div className="mb-4 flex items-center justify-end gap-1 lg:gap-2">
-            {signedIn && (
-              <IconLink
-                to="/notifications"
-                label="Notifications"
-                className="size-7 lg:size-9"
-              >
-                <Bell />
-              </IconLink>
-            )}
+            {signedIn && <NotificationsBell className="size-7 lg:size-9" />}
             <AccountMenu auth={auth} />
           </div>
           <div className="hidden space-y-10 lg:block">

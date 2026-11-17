@@ -6,8 +6,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { navigation } from "./navigation";
+import { NotificationsBell } from "@/features/notifications/notifications";
 
-export function NavigationSidebar() {
+export function NavigationSidebar({
+  showNotifications = false,
+}: {
+  showNotifications?: boolean;
+}) {
   return (
     <aside
       aria-label="Sidebar"
@@ -88,6 +93,7 @@ export function NavigationSidebar() {
               </TooltipContent>
             </Tooltip>
           ))}
+          {showNotifications && <NotificationsBell className="ml-1" />}
         </nav>
       </div>
       <nav

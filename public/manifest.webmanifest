@@ -1,0 +1,13 @@
+{
+  "id": "/",
+  "name": "ysocial",
+  "short_name": "ysocial",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#171717",
+  "icons": [
+    { "src": "/fullfav.png", "sizes": "1600x1600", "type": "image/png", "purpose": "any" }
+  ]
+}
