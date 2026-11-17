@@ -1,10 +1,42 @@
-import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
+import {
+  findEmojis,
+  findShortcodes,
+  renderShortcodes,
+  searchEmojis,
+  shortcodeQueryAt,
+  type EmojiMatch,
+} from "@/lib/emoji";
+import { useEmojiIndex } from "@/lib/use-emoji-index";
 
 type Suggestion = Awaited<
   ReturnType<typeof api.mentionSuggestions>
 >["users"][number];
+
+function swap(
+  element: HTMLTextAreaElement,
+  start: number,
+  end: number,
+  text: string,
+) {
+  element.setSelectionRange(start, end);
+  if (
+    document.activeElement === element &&
+    document.execCommand("insertText", false, text)
+  )
+    return;
+  element.setRangeText(text, start, end, "end");
+  element.dispatchEvent(new Event("input", { bubbles: true }));
+}
 
 export function MentionTextarea({
   value,
@@ -14,12 +46,15 @@ export function MentionTextarea({
   onSelect,
   onBlur,
   onFocus,
+  onClick,
   ref,
+  emojis = "render",
   wrapperClassName = "relative",
   ...props
 }: Omit<ComponentProps<typeof Textarea>, "value"> & {
   value: string;
   onValueChange: (value: string) => void;
+  emojis?: "render" | "plain";
   wrapperClassName?: string;
 }) {
   const input = useRef<HTMLTextAreaElement | null>(null);
@@ -29,6 +64,8 @@ export function MentionTextarea({
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [active, setActive] = useState(0);
+  const [emojiActive, setEmojiActive] = useState({ query: "", index: 0 });
+  const index = useEmojiIndex(focused);
   const match = value
     .slice(0, caret)
     .match(/(?<![\p{L}\p{N}_@/.])@([a-z0-9_]{1,32})$/iu);
@@ -42,6 +79,29 @@ export function MentionTextarea({
   const token = `${caret}:${value}`;
   const users = query !== null && dismissed !== token ? suggestions : [];
   const selected = Math.min(active, Math.max(0, users.length - 1));
+  const emojiQuery =
+    focused && !props.disabled && index && !match
+      ? shortcodeQueryAt(value, caret)
+      : null;
+  const emojiList = useMemo<EmojiMatch[]>(
+    () =>
+      index && emojiQuery && dismissed !== token
+        ? searchEmojis(index, emojiQuery.query)
+        : [],
+    [index, emojiQuery, dismissed, token],
+  );
+  const emojiSelected =
+    emojiActive.query === emojiQuery?.query ? emojiActive.index : 0;
+  const open = users.length ? "users" : emojiList.length ? "emojis" : null;
+  const count = open === "users" ? users.length : emojiList.length;
+  const current = open === "users" ? selected : emojiSelected;
+
+  useEffect(() => {
+    if (!open) return;
+    document
+      .getElementById(`${listId}-${current}`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [open, current, listId]);
 
   useEffect(() => {
     if (query === null || dismissed === token) return;
@@ -82,6 +142,58 @@ export function MentionTextarea({
     });
   }
 
+  function chooseEmoji(item: EmojiMatch) {
+    const element = input.current;
+    if (!element || !emojiQuery) return;
+    const text = emojis === "render" ? item.emoji : `:${item.name}:`;
+    const spacer = /^\s/.test(element.value.slice(emojiQuery.end)) ? "" : " ";
+    swap(element, emojiQuery.start, emojiQuery.end, text + spacer);
+    setDismissed(token);
+  }
+
+  function move(next: number) {
+    if (open === "users") setActive(next);
+    else setEmojiActive({ query: emojiQuery?.query ?? "", index: next });
+  }
+
+  function renderAway(element: HTMLTextAreaElement) {
+    if (!index || emojis !== "render") return;
+    if (element.selectionStart !== element.selectionEnd) return;
+    const at = element.selectionStart;
+    const away = findShortcodes(element.value, index).filter(
+      (span) => at < span.start || at > span.end,
+    );
+    if (!away.length) return;
+    let shift = 0;
+    for (const span of away.reverse()) {
+      swap(element, span.start, span.end, span.emoji);
+      if (span.end <= at) shift += span.emoji.length - (span.end - span.start);
+    }
+    element.setSelectionRange(at + shift, at + shift);
+  }
+
+  function reveal(
+    element: HTMLTextAreaElement,
+    side: "before" | "after",
+    caretAt: "edge" | "inside",
+  ) {
+    if (!index || emojis !== "render") return false;
+    if (element.selectionStart !== element.selectionEnd) return false;
+    const at = element.selectionStart;
+    const span = findEmojis(element.value, index).find((item) =>
+      side === "before" ? item.end === at : item.start === at,
+    );
+    if (!span) return false;
+    const code = `:${span.name}:`;
+    swap(element, span.start, span.end, code);
+    const place =
+      side === "before"
+        ? span.start + code.length - (caretAt === "inside" ? 1 : 0)
+        : span.start + (caretAt === "inside" ? 1 : 0);
+    element.setSelectionRange(place, place);
+    return true;
+  }
+
   return (
     <div className={wrapperClassName}>
       <Textarea
@@ -93,18 +205,35 @@ export function MentionTextarea({
           if (ref) ref.current = element;
         }}
         onChange={(event) => {
-          setCaret(event.currentTarget.selectionStart);
+          const element = event.currentTarget;
+          setCaret(element.selectionStart);
           onChange?.(event);
+          const native = event.nativeEvent as InputEvent;
+          if (
+            index &&
+            emojis === "render" &&
+            native.inputType === "insertText" &&
+            native.data === ":" &&
+            !native.isComposing
+          ) {
+            queueMicrotask(() => {
+              if (element.selectionStart !== element.selectionEnd) return;
+              const at = element.selectionStart;
+              const span = findShortcodes(element.value, index).find(
+                (item) => item.end === at,
+              );
+              if (span) swap(element, span.start, span.end, span.emoji);
+            });
+          }
         }}
         aria-autocomplete="list"
-        aria-controls={users.length ? listId : props["aria-controls"]}
+        aria-controls={open ? listId : props["aria-controls"]}
         aria-activedescendant={
-          users.length
-            ? `${listId}-${selected}`
-            : props["aria-activedescendant"]
+          open ? `${listId}-${current}` : props["aria-activedescendant"]
         }
         onSelect={(event) => {
           setCaret(event.currentTarget.selectionStart);
+          renderAway(event.currentTarget);
           onSelect?.(event);
         }}
         onFocus={(event) => {
@@ -114,16 +243,26 @@ export function MentionTextarea({
         }}
         onBlur={(event) => {
           setFocused(false);
+          const element = event.currentTarget;
+          if (index && emojis === "render") {
+            const rendered = renderShortcodes(element.value, index);
+            if (rendered !== element.value)
+              swap(element, 0, element.value.length, rendered);
+          }
           onBlur?.(event);
         }}
+        onClick={(event) => {
+          const element = event.currentTarget;
+          if (!reveal(element, "before", "edge"))
+            reveal(element, "after", "edge");
+          onClick?.(event);
+        }}
         onKeyDown={(event) => {
-          if (users.length && !event.nativeEvent.isComposing) {
+          if (open && !event.nativeEvent.isComposing) {
             if (event.key === "ArrowDown" || event.key === "ArrowUp") {
               event.preventDefault();
-              setActive(
-                (selected +
-                  (event.key === "ArrowDown" ? 1 : users.length - 1)) %
-                  users.length,
+              move(
+                (current + (event.key === "ArrowDown" ? 1 : count - 1)) % count,
               );
               return;
             }
@@ -134,7 +273,8 @@ export function MentionTextarea({
               !event.shiftKey
             ) {
               event.preventDefault();
-              choose(users[selected]);
+              if (open === "users") choose(users[selected]);
+              else chooseEmoji(emojiList[emojiSelected]);
               return;
             }
             if (event.key === "Escape") {
@@ -144,6 +284,22 @@ export function MentionTextarea({
               return;
             }
           }
+          if (
+            (event.key === "ArrowLeft" || event.key === "ArrowRight") &&
+            !event.shiftKey &&
+            !event.ctrlKey &&
+            !event.altKey &&
+            !event.metaKey &&
+            !event.nativeEvent.isComposing &&
+            reveal(
+              event.currentTarget,
+              event.key === "ArrowLeft" ? "before" : "after",
+              "inside",
+            )
+          ) {
+            event.preventDefault();
+            return;
+          }
           onKeyDown?.(event);
         }}
       />
@@ -152,7 +308,7 @@ export function MentionTextarea({
           id={listId}
           role="listbox"
           aria-label="Username suggestions"
-          className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg"
+          className="absolute inset-x-0 top-full z-50 mt-2 max-h-56 overflow-y-auto overscroll-contain rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg"
         >
           {users.map((user, index) => (
             <div
@@ -173,6 +329,42 @@ export function MentionTextarea({
                   {user.displayName}
                 </span>
               )}
+            </div>
+          ))}
+        </div>
+      )}
+      {open === "emojis" && (
+        <div
+          id={listId}
+          role="listbox"
+          aria-label="Emoji suggestions"
+          className="absolute inset-x-0 top-full z-50 mt-2 max-h-48 overflow-y-auto overscroll-contain rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg"
+        >
+          {emojiList.map((item, position) => (
+            <div
+              key={item.name}
+              id={`${listId}-${position}`}
+              role="option"
+              aria-selected={emojiSelected === position}
+              className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-1.5 text-sm ${emojiSelected === position ? "bg-accent text-accent-foreground" : ""}`}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                chooseEmoji(item);
+              }}
+              onPointerMove={() =>
+                setEmojiActive({
+                  query: emojiQuery?.query ?? "",
+                  index: position,
+                })
+              }
+            >
+              <span
+                aria-hidden="true"
+                className="w-6 text-center text-lg leading-none"
+              >
+                {item.emoji}
+              </span>
+              <span className="min-w-0 truncate">:{item.name}:</span>
             </div>
           ))}
         </div>
