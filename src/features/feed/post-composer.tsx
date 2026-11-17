@@ -22,6 +22,8 @@ import type { FeedState } from "./use-feed";
 import { GifPicker } from "@/features/gifs/gif-picker";
 import type { GifSearchItem } from "@/lib/api";
 import { splitWrittenTopics } from "@/lib/topics";
+import { renderShortcodes } from "@/lib/emoji";
+import { useEmojiIndex } from "@/lib/use-emoji-index";
 import {
   TopicSuggestionList,
   topicOptionId,
@@ -164,7 +166,9 @@ function AuthenticatedPostComposer({
     caret,
     topics && focused && feed.canPost,
   );
-  const length = Array.from(draft.trim()).length;
+  const emojiIndex = useEmojiIndex(focused);
+  const finalDraft = emojiIndex ? renderShortcodes(draft, emojiIndex) : draft;
+  const length = Array.from(finalDraft.trim()).length;
   const valid = feed.canPost && (length > 0 || gif !== null) && length <= LIMIT;
 
   // A hidden copy of the text measures how tall the field needs to be, so the
@@ -206,10 +210,10 @@ function AuthenticatedPostComposer({
 
   function publish() {
     if (!valid) return;
-    if (!feed.publishPost(draft, gif)) return;
-    setDraft("");
+    if (!feed.publishPost(finalDraft, gif)) return;
     setGif(null);
     textarea.current?.blur();
+    setDraft("");
     setPublished(true);
   }
 

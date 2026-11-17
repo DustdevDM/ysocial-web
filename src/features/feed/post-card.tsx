@@ -12,6 +12,15 @@ import { AvatarCircles } from "@/components/ui/avatar-circles";
 import { EditHistory } from "./edit-history";
 import { cn } from "@/lib/utils";
 import type { Post } from "@/lib/api";
+import {
+  JUMBO_MAX,
+  emojiOnlyCount,
+  loadEmojiIndex,
+  peekEmojiIndex,
+  renderShortcodes,
+  toShortcodes,
+} from "@/lib/emoji";
+import { useEmojiIndex } from "@/lib/use-emoji-index";
 import type { FeedState } from "./use-feed";
 
 export function PostCard({
@@ -49,9 +58,14 @@ export function PostCard({
   const optimistic = feed.optimisticPostIds.includes(post.id);
   const mine = post.author.id === feed.viewerId;
   const busy = feed.pending.includes(post.id);
-  const length = Array.from(content.trim()).length;
+  const emojiIndex = useEmojiIndex(editing);
+  const finalContent = emojiIndex
+    ? renderShortcodes(content, emojiIndex)
+    : content;
+  const length = Array.from(finalContent.trim()).length;
   const validCaption = (length > 0 || post.gif !== null) && length <= 2000;
-  const changed = content.trim() !== post.content.trim();
+  const changed = finalContent.trim() !== post.content.trim();
+  const jumbo = post.gif ? 0 : emojiOnlyCount(post.content);
   const profilePath = `/@${post.author.handle}`;
   const openable = !focused && !optimistic && !editing;
   const openTimer = useRef<number | undefined>(undefined);
@@ -85,7 +99,19 @@ export function PostCard({
   }
   function save() {
     if (busy || !changed || !validCaption) return;
-    if (feed.editPost(post, content)) setEditing(false);
+    if (feed.editPost(post, finalContent)) setEditing(false);
+  }
+  function startEditing() {
+    const loaded = peekEmojiIndex();
+    if (loaded || !/[^ -~\s]/.test(post.content)) {
+      setContent(loaded ? toShortcodes(post.content, loaded) : post.content);
+      setEditing(true);
+      return;
+    }
+    loadEmojiIndex()
+      .then((index) => setContent(toShortcodes(post.content, index)))
+      .catch(() => setContent(post.content))
+      .finally(() => setEditing(true));
   }
   return (
     <article
@@ -220,10 +246,7 @@ export function PostCard({
                         label="Edit post"
                         size="icon-sm"
                         disabled={busy}
-                        onClick={() => {
-                          setContent(post.content);
-                          setEditing(true);
-                        }}
+                        onClick={startEditing}
                       >
                         <Pencil />
                       </IconButton>
@@ -253,6 +276,7 @@ export function PostCard({
                 aria-invalid={!validCaption}
                 autoFocus
                 rows={3}
+                emojis="plain"
                 className="max-h-96 resize-y text-sm leading-relaxed"
                 value={content}
                 onValueChange={setContent}
@@ -296,8 +320,12 @@ export function PostCard({
               <p
                 data-selectable
                 className={cn(
-                  "mt-2 whitespace-pre-wrap break-words leading-relaxed",
-                  focused ? "text-base" : "text-sm",
+                  "mt-2 whitespace-pre-wrap break-words",
+                  jumbo > 0 && jumbo <= JUMBO_MAX
+                    ? jumbo <= 6
+                      ? "text-5xl leading-tight"
+                      : "text-3xl leading-snug"
+                    : cn("leading-relaxed", focused ? "text-base" : "text-sm"),
                 )}
               >
                 <PostText post={post} />
