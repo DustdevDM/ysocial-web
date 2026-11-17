@@ -4,6 +4,7 @@ import { ArrowLeft, RotateCcw } from "lucide-react";
 import { IconButton, IconLink } from "@/components/ui/icon-button";
 import { Feed } from "./feed";
 import { PostCard } from "./post-card";
+import { PostActivity } from "./post-activity";
 import { useFeed } from "./use-feed";
 import { getActionRevision, rememberPosts } from "./optimistic-actions";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -64,6 +65,7 @@ export function Thread({
           <ArrowLeft />
         </IconLink>
         <h1 className="text-lg font-semibold">Post</h1>
+        {post && !error && <PostActivity key={post.id} postId={post.id} />}
       </header>
       {wasDeleted ? (
         <p role="status" className="py-6 text-sm text-muted-foreground">

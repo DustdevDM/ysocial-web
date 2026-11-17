@@ -174,11 +174,13 @@ function DialogFooter({
 }: React.ComponentProps<"div"> & {
   showCloseButton?: boolean;
 }) {
+  const mobile = React.useContext(DialogMobileContext);
   return (
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 md:flex-row md:justify-end",
+        mobile && "*:min-h-12 *:w-full *:text-base",
         className,
       )}
       {...props}

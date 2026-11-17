@@ -76,6 +76,21 @@ const profileSchema = z.object({
 export type Post = z.infer<typeof postSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type Profile = z.infer<typeof profileSchema>;
+const notificationSchema = z.object({
+  id: z.string(),
+  kind: z.enum(["like", "repost", "reply", "follow"]),
+  actor: userSchema,
+  postId: z.string().nullable(),
+  preview: z.string().nullable(),
+  createdAt: z.string(),
+  readAt: z.string().nullable(),
+});
+export type SocialNotification = z.infer<typeof notificationSchema>;
+const notificationsSchema = z.object({
+  notifications: z.array(notificationSchema),
+  unreadCount: z.number(),
+  nextCursor: z.string().nullable(),
+});
 
 export class ApiError extends Error {
   readonly status: number;
@@ -249,6 +264,52 @@ function request<T>(
 }
 const postPath = (id: string) => `/api/posts/${encodeURIComponent(id)}`;
 export const api = {
+  notifications: (cursor?: string, unread = false, signal?: AbortSignal) =>
+    request(
+      `/api/notifications?unread=${unread}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      notificationsSchema,
+      "GET",
+      undefined,
+      signal,
+    ),
+  readNotification: (id: string) =>
+    request(
+      `/api/notifications/${encodeURIComponent(id)}/read`,
+      z.undefined(),
+      "PUT",
+    ),
+  readAllNotifications: (through: string) =>
+    request("/api/notifications/read", z.undefined(), "PUT", { through }),
+  pushConfig: (endpoint?: string, signal?: AbortSignal) =>
+    request(
+      `/api/notifications/push${endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : ""}`,
+      z.object({
+        publicKey: z.string().nullable(),
+        subscribed: z.boolean(),
+        promptDismissed: z.boolean(),
+        mutedUntil: z.string().nullable(),
+        mutedForever: z.boolean(),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
+  subscribePush: (subscription: PushSubscriptionJSON) =>
+    request("/api/notifications/push", z.undefined(), "PUT", subscription),
+  dismissNotificationPrompt: () =>
+    request("/api/notifications/push/prompt-dismissal", z.undefined(), "PUT"),
+  mutePush: (endpoint: string, duration: "1h" | "8h" | "forever" | "off") =>
+    request(
+      "/api/notifications/push/mute",
+      z.object({
+        mutedUntil: z.string().nullable(),
+        mutedForever: z.boolean(),
+      }),
+      "PATCH",
+      { endpoint, duration },
+    ),
+  unsubscribePush: (endpoint: string) =>
+    request("/api/notifications/push", z.undefined(), "DELETE", { endpoint }),
   handleAvailability: (handle: string, signal?: AbortSignal) =>
     request(
       `/api/profiles/${encodeURIComponent(handle)}/availability`,
@@ -338,6 +399,22 @@ export const api = {
     ),
   post: (id: string, signal?: AbortSignal) =>
     request(postPath(id), postResponseSchema, "GET", undefined, signal),
+  postActivity: (
+    id: string,
+    type: "likes" | "reposts",
+    cursor?: string,
+    signal?: AbortSignal,
+  ) =>
+    request(
+      `${postPath(id)}/activity?type=${type}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      z.object({
+        users: z.array(userSchema),
+        nextCursor: z.string().nullable(),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
   publish: (content: string, clientId?: string) =>
     request("/api/posts", postResponseSchema, "POST", { content, clientId }),
   replies: (id: string, cursor?: string, signal?: AbortSignal) =>

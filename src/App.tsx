@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import {
   BrowserRouter,
   Link,
@@ -7,6 +7,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
   useParams,
 } from "react-router";
 import { ArrowLeft, Construction, SearchX } from "lucide-react";
@@ -31,6 +32,8 @@ import { ProfileSkeleton } from "@/components/loading-skeletons";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { cn } from "@/lib/utils";
 import { SettingsPage } from "@/features/settings/settings";
+import { NotificationsProvider } from "@/features/notifications/notifications-context";
+import { NotificationsPage } from "@/features/notifications/notifications";
 
 export function App() {
   return (
@@ -47,12 +50,22 @@ export function App() {
 function AppShell() {
   const auth = useAuth();
   const centerScroll = useRef<HTMLElement>(null);
+  const logoClickCount = useRef(0);
+  const navigate = useNavigate();
   const { pathname, key: navigationKey } = useLocation();
   const profileHandle = matchPath("/:profileHandle", pathname)?.params
     .profileHandle;
   const hideAccountSidebar =
     /^@[a-z0-9_]{3,32}$/.test(profileHandle ?? "") ||
     matchPath("/profile", pathname) !== null;
+  function handleLogoClick(event: MouseEvent<HTMLAnchorElement>) {
+    logoClickCount.current += 1;
+    if (logoClickCount.current === 4) {
+      logoClickCount.current = 0;
+      event.preventDefault();
+      navigate("/asettings");
+    }
+  }
   useEffect(() => {
     centerScroll.current?.scrollTo({
       top: 0,
@@ -64,82 +77,101 @@ function AppShell() {
     });
   }, [pathname, navigationKey]);
   return (
-    <div className="flex h-dvh min-h-0 flex-col">
-      <MobileHeader auth={auth} />
-      <ConnectionBanner />
-      <main
-        className={cn(
-          "grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:divide-x md:divide-border",
-          hideAccountSidebar
-            ? "md:grid-cols-[4rem_minmax(0,1fr)] lg:grid-cols-[13rem_minmax(0,1fr)]"
-            : "md:grid-cols-[4rem_minmax(0,1fr)_4rem] lg:grid-cols-[13rem_minmax(0,1fr)_22rem]",
-        )}
-      >
-        <NavigationSidebar />
-        <section
-          ref={centerScroll}
-          aria-label="Main content"
-          tabIndex={0}
-          className="content-scroll min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] has-[[data-skeleton-scroll-lock]]:overflow-y-hidden sm:px-10 sm:pt-6 md:pb-6 lg:px-12"
+    <NotificationsProvider
+      key={
+        auth.session?.authenticated && !auth.session.needsOnboarding
+          ? auth.session.user.id
+          : "anonymous"
+      }
+      userId={
+        auth.session?.authenticated && !auth.session.needsOnboarding
+          ? auth.session.user.id
+          : null
+      }
+    >
+      <div className="flex h-dvh min-h-0 flex-col">
+        <MobileHeader auth={auth} onLogoClick={handleLogoClick} />
+        <ConnectionBanner />
+        <main
+          className={cn(
+            "grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:divide-x md:divide-border",
+            hideAccountSidebar
+              ? "md:grid-cols-[4rem_minmax(0,1fr)] lg:grid-cols-[13rem_minmax(0,1fr)]"
+              : "md:grid-cols-[4rem_minmax(0,1fr)_4rem] lg:grid-cols-[13rem_minmax(0,1fr)_22rem]",
+          )}
         >
-          <Account auth={auth} />
-          <Routes>
-            <Route path="/" element={<HomeFeed session={auth.session} />} />
-            <Route
-              path="/posts/:id"
-              element={<PostRoute session={auth.session} />}
-            />
-            <Route
-              path="/:profileHandle"
-              element={
-                <ProfileRoute
-                  session={auth.session}
-                  onAvatarSaved={auth.updateAvatar}
-                  onBannerSaved={auth.updateBanner}
-                  onProfileSaved={auth.updateProfile}
-                />
-              }
-            />
-            <Route path="/profile" element={<MyProfileRoute auth={auth} />} />
-            <Route path="/asettings" element={<SettingsPage auth={auth} />} />
-            <Route
-              path="/onboarding"
-              element={<OnboardingRoute session={auth.session} />}
-            />
-            <Route
-              path="/login"
-              element={<LoginRoute session={auth.session} />}
-            />
-            <Route path="/messages" element={<ComingSoon title="Messages" />} />
-            <Route path="/search" element={<ComingSoon title="Search" />} />
-            <Route
-              path="/legal/privacy"
-              element={<ComingSoon title="Privacy" />}
-            />
-            <Route path="/legal/terms" element={<ComingSoon title="Terms" />} />
-            <Route
-              path="/legal/imprint"
-              element={<ComingSoon title="Imprint" />}
-            />
-            <Route
-              path="/settings/feed"
-              element={<ComingSoon title="Feed preferences" />}
-            />
-            <Route
-              path="/communities"
-              element={<ComingSoon title="Communities" />}
-            />
-            <Route
-              path="/notifications"
-              element={<ComingSoon title="Notifications" />}
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </section>
-        {!hideAccountSidebar && <AccountSidebar auth={auth} />}
-      </main>
-      <MobileNavigation auth={auth} />
-    </div>
+          <NavigationSidebar
+            showNotifications={hideAccountSidebar}
+            onLogoClick={handleLogoClick}
+          />
+          <section
+            ref={centerScroll}
+            aria-label="Main content"
+            tabIndex={0}
+            className="content-scroll min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] has-[[data-skeleton-scroll-lock]]:overflow-y-hidden sm:px-10 sm:pt-6 md:pb-6 lg:px-12"
+          >
+            <Account auth={auth} />
+            <Routes>
+              <Route path="/" element={<HomeFeed session={auth.session} />} />
+              <Route
+                path="/posts/:id"
+                element={<PostRoute session={auth.session} />}
+              />
+              <Route
+                path="/:profileHandle"
+                element={
+                  <ProfileRoute
+                    session={auth.session}
+                    onAvatarSaved={auth.updateAvatar}
+                    onBannerSaved={auth.updateBanner}
+                    onProfileSaved={auth.updateProfile}
+                  />
+                }
+              />
+              <Route path="/profile" element={<MyProfileRoute auth={auth} />} />
+              <Route path="/asettings" element={<SettingsPage auth={auth} />} />
+              <Route
+                path="/onboarding"
+                element={<OnboardingRoute session={auth.session} />}
+              />
+              <Route
+                path="/login"
+                element={<LoginRoute session={auth.session} />}
+              />
+              <Route
+                path="/messages"
+                element={<ComingSoon title="Messages" />}
+              />
+              <Route path="/search" element={<ComingSoon title="Search" />} />
+              <Route
+                path="/legal/privacy"
+                element={<ComingSoon title="Privacy" />}
+              />
+              <Route
+                path="/legal/terms"
+                element={<ComingSoon title="Terms" />}
+              />
+              <Route
+                path="/legal/imprint"
+                element={<ComingSoon title="Imprint" />}
+              />
+              <Route
+                path="/settings/feed"
+                element={<ComingSoon title="Feed preferences" />}
+              />
+              <Route
+                path="/communities"
+                element={<ComingSoon title="Communities" />}
+              />
+              <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </section>
+          {!hideAccountSidebar && <AccountSidebar auth={auth} />}
+        </main>
+        <MobileNavigation auth={auth} />
+      </div>
+    </NotificationsProvider>
   );
 }
 
