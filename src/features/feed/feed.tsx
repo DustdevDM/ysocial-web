@@ -7,10 +7,11 @@ import { IconButton } from "@/components/ui/icon-button";
 import { PostComposer } from "./post-composer";
 import { PostCard } from "./post-card";
 import type { FeedState } from "./use-feed";
+import { PullToRefresh } from "./pull-to-refresh.tsx";
 
 export function Feed({ feed }: { feed: FeedState }) {
   return (
-    <>
+    <PullToRefresh disabled={feed.loading} onRefresh={feed.refresh}>
       <div className="min-h-13 md:min-h-14">
         {feed.sessionLoading ? (
           <ComposerSkeleton />
@@ -51,6 +52,6 @@ export function Feed({ feed }: { feed: FeedState }) {
           </div>
         )}
       </div>
-    </>
+    </PullToRefresh>
   );
 }
