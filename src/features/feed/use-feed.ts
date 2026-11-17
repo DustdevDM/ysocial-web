@@ -109,21 +109,17 @@ export function useFeed(
     void load(undefined, controller.signal, !!cached);
     return () => controller.abort();
   }, [load, session, autoLoad, cached]);
-  function publishPost(
-    text: string = draft,
-    attachments: Post["attachments"] = [],
-  ) {
+  function publishPost(text: string = draft) {
     const content = text.trim();
     if (
       !session?.authenticated ||
       session.needsOnboarding ||
-      (!content && !attachments.length) ||
+      !content ||
       Array.from(content).length > 2000
     )
       return;
     const sending = publishOptimistically({
       content,
-      attachments,
       author: session.user,
       parentId: parentId ?? null,
       onConfirmed: onPublished,
@@ -202,9 +198,7 @@ export function useFeed(
         : false,
     editPost: (post: Post, content: string) => {
       const trimmed = content.trim();
-      return viewerId &&
-        (trimmed || post.attachments.length > 0) &&
-        Array.from(trimmed).length <= 2000
+      return viewerId && trimmed && Array.from(trimmed).length <= 2000
         ? mutatePost(post, viewerId, {
             kind: "edit",
             content: trimmed,

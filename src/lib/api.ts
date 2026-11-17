@@ -14,20 +14,12 @@ const userSchema = z.object({
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
 });
-const attachmentSchema = z.object({
-  id: z.string(),
-  url: z.string(),
-  width: z.number(),
-  height: z.number(),
-});
-export type Attachment = z.infer<typeof attachmentSchema>;
 const postSchema = z.object({
   mentions: z
     .array(
       z.object({ id: z.string(), handle: z.string(), username: z.string() }),
     )
     .default([]),
-  attachments: z.array(attachmentSchema).default([]),
   id: z.string(),
   parentId: z.string().nullable(),
   content: z.string(),
@@ -151,11 +143,6 @@ const traceCodes: Record<string, number> = {
   avatar_not_found: 5003,
   avatar_storage_not_configured: 5004,
   avatar_storage_unavailable: 5005,
-  invalid_attachment: 5009,
-  unsupported_attachment_type: 5010,
-  attachment_expired: 5011,
-  attachment_not_found: 5012,
-  attachment_daily_limit: 5013,
   invalid_banner: 5006,
   invalid_banner_crop: 5007,
   banner_not_found: 5008,
@@ -273,19 +260,10 @@ function friendlyMessage(error: unknown) {
       return "This GIF selection expired. Search and select it again.";
     if (error.message === "klipy_not_configured")
       return "GIF search is not configured yet.";
-    if (
-      error.message === "invalid_attachment" ||
-      error.message === "unsupported_attachment_type"
-    )
-      return "Choose a still WebP, PNG, JPEG, JPG, or AVIF image up to 10 MB and 40 megapixels.";
-    if (error.message === "attachment_daily_limit")
-      return "You've reached your limit of 10 image uploads today. You can upload again after midnight UTC. Please consider donating in the future. Storage is expensive";
-    if (error.message === "attachment_expired")
-      return "This upload has expired. Attach the image again before posting.";
     if (error.message === "invalid_banner")
       return "Choose a JPEG, PNG, AVIF, WebP or GIF under 10 MB. Animated images must have no more than 120 frames.";
     if (error.message === "avatar_storage_not_configured")
-      return "Image uploads are not configured yet.";
+      return "Profile picture uploads are not configured yet.";
     if (error.message === "avatar_storage_unavailable")
       return "Picture storage is temporarily unavailable. Please try again.";
     if (
@@ -308,8 +286,7 @@ function friendlyMessage(error: unknown) {
     if (error.status === 0)
       return "You seem to be offline. Check your connection and try again.";
     if (error.status === 403) return "You don't have permission to do that.";
-    if (error.status === 404)
-      return "We couldn't find what you were looking for.";
+    if (error.status === 404) return "We couldn't find what you were looking for.";
     if (error.status === 429)
       return "Too many requests. Wait a moment, then try again.";
     if (error.status >= 500)
@@ -398,26 +375,6 @@ function request<T>(
 }
 const postPath = (id: string) => `/api/posts/${encodeURIComponent(id)}`;
 export const api = {
-  uploadAttachment: (picture: File, signal?: AbortSignal) => {
-    const extension = picture.name.toLowerCase().split(".").at(-1);
-    const types: Record<string, string> = {
-      png: "image/png",
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      webp: "image/webp",
-      avif: "image/avif",
-    };
-    const body = new Blob([picture], {
-      type: types[extension ?? ""] ?? picture.type,
-    });
-    return request(
-      "/api/attachments",
-      z.object({ attachment: attachmentSchema }),
-      "POST",
-      body,
-      signal,
-    );
-  },
   notifications: (cursor?: string, unread = false, signal?: AbortSignal) =>
     request(
       `/api/notifications?unread=${unread}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
@@ -589,12 +546,8 @@ export const api = {
       undefined,
       signal,
     ),
-  publish: (content: string, clientId?: string, attachmentIds: string[] = []) =>
-    request("/api/posts", postResponseSchema, "POST", {
-      content,
-      clientId,
-      attachmentIds,
-    }),
+  publish: (content: string, clientId?: string) =>
+    request("/api/posts", postResponseSchema, "POST", { content, clientId }),
   replies: (id: string, cursor?: string, signal?: AbortSignal) =>
     request(
       `${postPath(id)}/replies${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
@@ -603,16 +556,10 @@ export const api = {
       undefined,
       signal,
     ),
-  reply: (
-    id: string,
-    content: string,
-    clientId?: string,
-    attachmentIds: string[] = [],
-  ) =>
+  reply: (id: string, content: string, clientId?: string) =>
     request(`${postPath(id)}/replies`, postResponseSchema, "POST", {
       content,
       clientId,
-      attachmentIds,
     }),
   like: (id: string, liked: boolean) =>
     request(

@@ -83,13 +83,7 @@ export function PostCard({
     setEditing(false);
   }
   function save() {
-    if (
-      busy ||
-      !changed ||
-      (!length && !post.attachments.length) ||
-      length > 2000
-    )
-      return;
+    if (busy || !changed || !length || length > 2000) return;
     if (feed.editPost(post, content)) setEditing(false);
   }
   return (
@@ -204,12 +198,7 @@ export function PostCard({
                     <IconButton
                       label="Save changes"
                       size="icon-sm"
-                      disabled={
-                        busy ||
-                        !changed ||
-                        (!length && !post.attachments.length) ||
-                        length > 2000
-                      }
+                      disabled={busy || !changed || !length || length > 2000}
                       onClick={save}
                     >
                       <Check />
@@ -260,9 +249,7 @@ export function PostCard({
               <MentionTextarea
                 id={editorId}
                 aria-describedby={editorHelpId}
-                aria-invalid={
-                  (!length && !post.attachments.length) || length > 2000
-                }
+                aria-invalid={!length || length > 2000}
                 autoFocus
                 rows={3}
                 className="max-h-96 resize-y text-sm leading-relaxed"
@@ -290,7 +277,7 @@ export function PostCard({
                 className="flex justify-between gap-3 text-xs text-muted-foreground"
               >
                 <p>
-                  {!length && !post.attachments.length
+                  {!length
                     ? "Write something before saving."
                     : length > 2000
                       ? `Remove ${length - 2000} characters to save.`
@@ -313,28 +300,6 @@ export function PostCard({
             >
               <MentionText post={post} />
             </p>
-          )}
-          {post.attachments.length > 0 && (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {post.attachments.map((image, index) => (
-                <a
-                  key={image.id}
-                  href={image.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={post.attachments.length === 1 ? "col-span-2" : ""}
-                >
-                  <img
-                    src={image.url}
-                    width={image.width}
-                    height={image.height}
-                    alt={`Image ${index + 1} attached by ${post.author.displayName || post.author.handle}`}
-                    loading="lazy"
-                    className="max-h-[32rem] w-full rounded-xl bg-muted object-contain"
-                  />
-                </a>
-              ))}
-            </div>
           )}
           <PostActions post={post} feed={feed} />
           {post.friendLikes > 0 && (
