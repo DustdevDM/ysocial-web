@@ -106,7 +106,9 @@ export function EditHistory({
                   )}
                 </p>
                 <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-                  {version.content}
+                  {version.content || (
+                    <span className="text-muted-foreground">No caption</span>
+                  )}
                 </p>
               </li>
             ))}

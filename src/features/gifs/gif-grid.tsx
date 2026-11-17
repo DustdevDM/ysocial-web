@@ -6,10 +6,9 @@ import {
   useState,
   type RefObject,
 } from "react";
-import type { api } from "@/lib/api";
+import type { GifSearchItem } from "@/lib/api";
 import { GifPreview } from "./gif-preview";
 
-type Gif = Awaited<ReturnType<typeof api.searchGifs>>["items"][number];
 const gap = 8;
 const overscan = 200;
 
@@ -19,10 +18,10 @@ export function GifGrid({
   disabled,
   onSelect,
 }: {
-  items: Gif[];
+  items: GifSearchItem[];
   scrollRoot: RefObject<HTMLDivElement | null>;
   disabled: boolean;
-  onSelect: (item: Gif) => void;
+  onSelect: (item: GifSearchItem) => void;
 }) {
   const grid = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 0, height: 320, top: 0 });

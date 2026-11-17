@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { ArrowUp, Construction, Plus } from "lucide-react";
+import { ArrowUp, X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { FeedState } from "./use-feed";
+import { GifPicker } from "@/features/gifs/gif-picker";
+import type { GifSearchItem } from "@/lib/api";
 import { splitWrittenTopics } from "@/lib/topics";
 import { renderShortcodes } from "@/lib/emoji";
 import { useEmojiIndex } from "@/lib/use-emoji-index";
@@ -145,7 +147,8 @@ function AuthenticatedPostComposer({
   topics: boolean;
 }) {
   const [published, setPublished] = useState(false);
-  const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [gif, setGif] = useState<GifSearchItem | null>(null);
   // Kept here, not in the feed state: typing must not re-render every post.
   const [draft, setDraft] = useState("");
   const [height, setHeight] = useState<number>();
@@ -166,8 +169,7 @@ function AuthenticatedPostComposer({
   const emojiIndex = useEmojiIndex(focused);
   const finalDraft = emojiIndex ? renderShortcodes(draft, emojiIndex) : draft;
   const length = Array.from(finalDraft.trim()).length;
-  const empty = length === 0;
-  const valid = feed.canPost && !empty && length <= LIMIT;
+  const valid = feed.canPost && (length > 0 || gif !== null) && length <= LIMIT;
 
   // A hidden copy of the text measures how tall the field needs to be, so the
   // visible one can animate between heights (field-sizing cannot transition).
@@ -208,7 +210,8 @@ function AuthenticatedPostComposer({
 
   function publish() {
     if (!valid) return;
-    if (!feed.publishPost(finalDraft)) return;
+    if (!feed.publishPost(finalDraft, gif)) return;
+    setGif(null);
     textarea.current?.blur();
     setDraft("");
     setPublished(true);
@@ -216,17 +219,40 @@ function AuthenticatedPostComposer({
 
   const textClass = "py-1.5 text-sm leading-6 md:text-base";
   return (
-    <Dialog open={attachmentsOpen} onOpenChange={setAttachmentsOpen}>
+    <Dialog open={gifPickerOpen} onOpenChange={setGifPickerOpen}>
       {/* Equal 8px padding above, below and right of the buttons (36px). */}
       <div className="relative mx-auto w-full max-w-xl">
         <form
-          className="flex w-full items-end gap-2 rounded-[1.75rem] bg-muted p-2 pl-4 transition-shadow focus-within:ring-1 focus-within:ring-border sm:pl-5"
+          className="flex w-full flex-wrap items-end gap-2 rounded-[1.75rem] bg-muted p-2 pl-4 transition-shadow focus-within:ring-1 focus-within:ring-border sm:pl-5"
           aria-label="Post composer"
           onSubmit={(event) => {
             event.preventDefault();
             publish();
           }}
         >
+          {gif && (
+            <div className="w-full pt-2">
+              <div className="relative w-fit max-w-full">
+                <img
+                  src={gif.previewUrl}
+                  alt={gif.title}
+                  className="max-h-40 max-w-full rounded-xl"
+                />
+                <IconButton
+                  label="Remove GIF"
+                  type="button"
+                  size="icon-sm"
+                  className="absolute top-1 right-1 rounded-full bg-background"
+                  onClick={() => {
+                    setGif(null);
+                    textarea.current?.focus();
+                  }}
+                >
+                  <X />
+                </IconButton>
+              </div>
+            </div>
+          )}
           <div
             className="relative min-w-0 flex-1 transition-[height] duration-200 ease-out"
             style={{
@@ -341,13 +367,14 @@ function AuthenticatedPostComposer({
             <DialogTrigger
               render={
                 <IconButton
-                  label="Add attachment"
+                  label={gif ? "Change GIF" : "Add GIF"}
                   type="button"
-                  className={`rounded-full text-muted-foreground transition-opacity ${empty ? "opacity-50" : ""}`}
+                  disabled={!feed.canPost}
+                  className="rounded-full text-muted-foreground"
                 />
               }
             >
-              <Plus />
+              <span className="text-[10px] font-semibold">GIF</span>
             </DialogTrigger>
             <IconButton
               label="Publish post"
@@ -381,20 +408,14 @@ function AuthenticatedPostComposer({
             : ""}
         </p>
       </div>
-      <DialogContent>
-        <div className="flex size-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-          <Construction className="size-6" aria-hidden="true" />
-        </div>
-        <DialogHeader>
-          <DialogTitle>Attachments are under construction</DialogTitle>
-          <DialogDescription>
-            We're working on uploads. You can share a text post for now.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose render={<Button />}>Got it</DialogClose>
-        </DialogFooter>
-      </DialogContent>
+      {gifPickerOpen && (
+        <GifPicker
+          onSelect={(item) => {
+            setGif(item);
+            setGifPickerOpen(false);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

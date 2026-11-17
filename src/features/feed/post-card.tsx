@@ -63,8 +63,9 @@ export function PostCard({
     ? renderShortcodes(content, emojiIndex)
     : content;
   const length = Array.from(finalContent.trim()).length;
+  const validCaption = (length > 0 || post.gif !== null) && length <= 2000;
   const changed = finalContent.trim() !== post.content.trim();
-  const jumbo = emojiOnlyCount(post.content);
+  const jumbo = post.gif ? 0 : emojiOnlyCount(post.content);
   const profilePath = `/@${post.author.handle}`;
   const openable = !focused && !optimistic && !editing;
   const openTimer = useRef<number | undefined>(undefined);
@@ -97,7 +98,7 @@ export function PostCard({
     setEditing(false);
   }
   function save() {
-    if (busy || !changed || !length || length > 2000) return;
+    if (busy || !changed || !validCaption) return;
     if (feed.editPost(post, finalContent)) setEditing(false);
   }
   function startEditing() {
@@ -224,7 +225,7 @@ export function PostCard({
                     <IconButton
                       label="Save changes"
                       size="icon-sm"
-                      disabled={busy || !changed || !length || length > 2000}
+                      disabled={busy || !changed || !validCaption}
                       onClick={save}
                     >
                       <Check />
@@ -272,7 +273,7 @@ export function PostCard({
               <MentionTextarea
                 id={editorId}
                 aria-describedby={editorHelpId}
-                aria-invalid={!length || length > 2000}
+                aria-invalid={!validCaption}
                 autoFocus
                 rows={3}
                 emojis="plain"
@@ -301,7 +302,7 @@ export function PostCard({
                 className="flex justify-between gap-3 text-xs text-muted-foreground"
               >
                 <p>
-                  {!length
+                  {!length && !post.gif
                     ? "Write something before saving."
                     : length > 2000
                       ? `Remove ${length - 2000} characters to save.`
@@ -315,19 +316,30 @@ export function PostCard({
               </div>
             </div>
           ) : (
-            <p
-              data-selectable
-              className={cn(
-                "mt-2 whitespace-pre-wrap break-words",
-                jumbo > 0 && jumbo <= JUMBO_MAX
-                  ? jumbo <= 6
-                    ? "text-5xl leading-tight"
-                    : "text-3xl leading-snug"
-                  : cn("leading-relaxed", focused ? "text-base" : "text-sm"),
-              )}
-            >
-              <PostText post={post} />
-            </p>
+            post.content && (
+              <p
+                data-selectable
+                className={cn(
+                  "mt-2 whitespace-pre-wrap break-words",
+                  jumbo > 0 && jumbo <= JUMBO_MAX
+                    ? jumbo <= 6
+                      ? "text-5xl leading-tight"
+                      : "text-3xl leading-snug"
+                    : cn("leading-relaxed", focused ? "text-base" : "text-sm"),
+                )}
+              >
+                <PostText post={post} />
+              </p>
+            )
+          )}
+          {post.gif && (
+            <img
+              src={post.gif.url}
+              alt={post.gif.title}
+              loading="lazy"
+              decoding="async"
+              className="mt-2 max-h-96 w-auto max-w-full rounded-xl object-contain"
+            />
           )}
           <PostActions post={post} feed={feed} />
           {post.friendLikes > 0 && (
