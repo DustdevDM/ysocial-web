@@ -338,6 +338,22 @@ export const api = {
     ),
   post: (id: string, signal?: AbortSignal) =>
     request(postPath(id), postResponseSchema, "GET", undefined, signal),
+  postActivity: (
+    id: string,
+    type: "likes" | "reposts",
+    cursor?: string,
+    signal?: AbortSignal,
+  ) =>
+    request(
+      `${postPath(id)}/activity?type=${type}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      z.object({
+        users: z.array(userSchema),
+        nextCursor: z.string().nullable(),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
   publish: (content: string, clientId?: string) =>
     request("/api/posts", postResponseSchema, "POST", { content, clientId }),
   replies: (id: string, cursor?: string, signal?: AbortSignal) =>
