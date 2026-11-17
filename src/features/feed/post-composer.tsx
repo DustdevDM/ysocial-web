@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/tooltip";
 import type { FeedState } from "./use-feed";
 import { splitWrittenTopics } from "@/lib/topics";
+import { renderShortcodes } from "@/lib/emoji";
+import { useEmojiIndex } from "@/lib/use-emoji-index";
 import {
   TopicSuggestionList,
   topicOptionId,
@@ -161,7 +163,9 @@ function AuthenticatedPostComposer({
     caret,
     topics && focused && feed.canPost,
   );
-  const length = Array.from(draft.trim()).length;
+  const emojiIndex = useEmojiIndex(focused);
+  const finalDraft = emojiIndex ? renderShortcodes(draft, emojiIndex) : draft;
+  const length = Array.from(finalDraft.trim()).length;
   const empty = length === 0;
   const valid = feed.canPost && !empty && length <= LIMIT;
 
@@ -204,9 +208,9 @@ function AuthenticatedPostComposer({
 
   function publish() {
     if (!valid) return;
-    if (!feed.publishPost(draft)) return;
-    setDraft("");
+    if (!feed.publishPost(finalDraft)) return;
     textarea.current?.blur();
+    setDraft("");
     setPublished(true);
   }
 
