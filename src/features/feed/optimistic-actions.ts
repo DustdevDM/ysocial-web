@@ -134,8 +134,7 @@ function applyPost(post: Post, command: PostCommand): Post {
         ...post,
         content: command.content,
         editedAt: command.editedAt,
-        // The API re-derives a top-level post's topics from its new text.
-        topics: post.parentId ? post.topics : extractTopics(command.content),
+        topics: extractTopics(command.content),
       };
     case "delete":
       return post;

@@ -246,7 +246,6 @@ export function Thread({
             <PostComposer
               feed={feed}
               placeholder="Write a reply…"
-              topics={false}
             />
           </div>
           <h2 className="mb-1 text-base font-semibold">

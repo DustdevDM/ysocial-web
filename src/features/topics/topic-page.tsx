@@ -11,7 +11,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { api, type Session } from "@/lib/api";
 import { countFormat } from "@/lib/count-format";
 
-/** Every top-level post that uses a topic, newest first. */
+/** Every post or reply that uses a topic, newest first. */
 export function TopicPage({
   topic,
   session,

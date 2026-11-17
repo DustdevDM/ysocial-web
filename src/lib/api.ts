@@ -35,7 +35,7 @@ const postSchema = z.object({
   // Mutual follows who liked this post: how many, and the first few.
   friendLikes: z.number().default(0),
   friendLikers: z.array(userSchema).default([]),
-  // Normalized topics (#name) of a top-level post; replies have none.
+  // Normalized topics (#name) in the post or reply.
   topics: z.array(z.string()).default([]),
 });
 const topicCountSchema = z.object({ name: z.string(), count: z.number() });
