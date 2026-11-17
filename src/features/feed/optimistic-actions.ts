@@ -6,6 +6,7 @@ import {
   type Profile,
 } from "@/lib/api";
 import { showRetryToast as retryToast } from "@/lib/retry-toast";
+import { extractTopics } from "@/lib/topics";
 
 type PostCommand =
   | { kind: "like"; value: boolean }
@@ -129,7 +130,13 @@ function applyPost(post: Post, command: PostCommand): Post {
         ),
       };
     case "edit":
-      return { ...post, content: command.content, editedAt: command.editedAt };
+      return {
+        ...post,
+        content: command.content,
+        editedAt: command.editedAt,
+        // The API re-derives a top-level post's topics from its new text.
+        topics: post.parentId ? post.topics : extractTopics(command.content),
+      };
     case "delete":
       return post;
     default: {
@@ -242,6 +249,7 @@ export function mutatePost(
                 content: saved.content,
                 editedAt: saved.editedAt,
                 editExpiresAt: saved.editExpiresAt,
+                topics: saved.topics,
               };
               break;
             }

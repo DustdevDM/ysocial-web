@@ -1,18 +1,127 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router";
+import NumberFlow from "@number-flow/react";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { subscribeToPublished } from "@/features/feed/post-outbox";
+import { api, type TopicCount } from "@/lib/api";
+import { countFormat } from "@/lib/count-format";
+import { topicPath } from "@/lib/topics";
+
+const REFRESH_EVERY = 60_000;
+
+/** The most used topics of the last 24 hours, kept fresh while the tab is open. */
+function useTrendingTopics() {
+  const [topics, setTopics] = useState<TopicCount[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let controller: AbortController | undefined;
+    function load() {
+      controller?.abort();
+      const own = (controller = new AbortController());
+      api
+        .trendingTopics(own.signal)
+        .then((result) => {
+          setTopics(result.topics);
+          setFailed(false);
+        })
+        .catch(() => {
+          if (!own.signal.aborted) setFailed(true);
+        });
+    }
+    load();
+    const timer = setInterval(() => {
+      if (!document.hidden) load();
+    }, REFRESH_EVERY);
+    const onVisible = () => {
+      if (!document.hidden) load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const unsubscribe = subscribeToPublished(load);
+    return () => {
+      controller?.abort();
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      unsubscribe();
+    };
+  }, []);
+  return { topics, failed };
+}
+
 export function TrendingTopics() {
+  const { topics, failed } = useTrendingTopics();
   return (
     <section aria-labelledby="trending-heading">
-      <h2 id="trending-heading" className="text-base font-semibold">
-        Trending Topics
-      </h2>
-      <ul className="mt-3 space-y-1 text-sm">
-        {["#1", "#2", "#3"].map((topic) => (
-          <li key={topic} className="py-2">
-            <span className="transition-colors hover:text-primary hover:underline">
-              {topic}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <h2
+              id="trending-heading"
+              tabIndex={0}
+              className="w-fit rounded-sm text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          }
+        >
+          Trending Topics
+        </TooltipTrigger>
+        <TooltipContent side="left">
+          The topics with the most new posts in the last 24 hours
+        </TooltipContent>
+      </Tooltip>
+      {topics === null && !failed && (
+        <ul aria-hidden="true" className="mt-3 space-y-1">
+          {[0, 1, 2].map((row) => (
+            <li key={row} className="flex items-center justify-between py-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-6" />
+            </li>
+          ))}
+        </ul>
+      )}
+      {topics === null && failed && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Couldn't load topics.
+        </p>
+      )}
+      {topics?.length === 0 && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Nothing is trending yet. Add #topic to a post to start one.
+        </p>
+      )}
+      {topics && topics.length > 0 && (
+        <ul className="mt-3 space-y-1 text-sm">
+          {topics.map((topic) => (
+            <li key={topic.name}>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Link
+                      to={topicPath(topic.name)}
+                      aria-label={`#${topic.name}, ${topic.count.toLocaleString()} ${topic.count === 1 ? "post" : "posts"} in the last 24 hours`}
+                      className="group flex items-center justify-between gap-3 rounded-sm py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  }
+                >
+                  <span className="min-w-0 truncate transition-colors group-hover:text-primary group-hover:underline">
+                    #{topic.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                    <NumberFlow format={countFormat} value={topic.count} />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  {topic.count.toLocaleString()}{" "}
+                  {topic.count === 1 ? "post" : "posts"} in the last 24 hours
+                </TooltipContent>
+              </Tooltip>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

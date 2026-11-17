@@ -35,7 +35,10 @@ const postSchema = z.object({
   // Mutual follows who liked this post: how many, and the first few.
   friendLikes: z.number().default(0),
   friendLikers: z.array(userSchema).default([]),
+  // Normalized topics (#name) of a top-level post; replies have none.
+  topics: z.array(z.string()).default([]),
 });
+const topicCountSchema = z.object({ name: z.string(), count: z.number() });
 const pageSchema = z.object({
   posts: z.array(postSchema),
   nextCursor: z.string().nullable(),
@@ -89,6 +92,7 @@ const profileSchema = z.object({
   serverNow: z.string(),
 });
 export type Post = z.infer<typeof postSchema>;
+export type TopicCount = z.infer<typeof topicCountSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 const notificationSchema = z.object({
@@ -125,6 +129,7 @@ const traceCodes: Record<string, number> = {
   invalid_content: 2004,
   invalid_post_id: 2005,
   post_id_conflict: 2006,
+  invalid_topic: 2007,
   // profile
   profile_not_found: 3001,
   invalid_profile: 3002,
@@ -278,6 +283,7 @@ function friendlyMessage(error: unknown) {
       return "This picture is too large. Choose a smaller image.";
     if (error.message === "post_not_found")
       return "This post no longer exists.";
+    if (error.message === "invalid_topic") return "This isn't a valid topic.";
     if (error.message === "retry_account_changed")
       return "Sign in to the original account before retrying this action.";
     if (error.message === "post_id_conflict")
@@ -503,10 +509,43 @@ export const api = {
       signal,
     ),
   logout: () => request("/auth/logout", z.undefined(), "POST"),
-  posts: (cursor?: string, signal?: AbortSignal) =>
-    request(
-      `/api/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+  posts: (cursor?: string, signal?: AbortSignal, topic?: string) => {
+    const query = new URLSearchParams();
+    if (topic) query.set("topic", topic);
+    if (cursor) query.set("cursor", cursor);
+    return request(
+      `/api/posts${query.size ? `?${query}` : ""}`,
       pageSchema,
+      "GET",
+      undefined,
+      signal,
+    );
+  },
+  /** The most used topics of the last 24 hours. */
+  trendingTopics: (signal?: AbortSignal) =>
+    request(
+      "/api/topics",
+      z.object({
+        topics: z.array(topicCountSchema),
+        windowHours: z.number(),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
+  /** Existing topics starting with a prefix, for autocomplete. */
+  suggestTopics: (prefix: string, signal?: AbortSignal) =>
+    request(
+      `/api/topics?prefix=${encodeURIComponent(prefix)}`,
+      z.object({ topics: z.array(topicCountSchema) }),
+      "GET",
+      undefined,
+      signal,
+    ),
+  topic: (name: string, signal?: AbortSignal) =>
+    request(
+      `/api/topics/${encodeURIComponent(name)}`,
+      z.object({ topic: z.object({ name: z.string(), posts: z.number() }) }),
       "GET",
       undefined,
       signal,

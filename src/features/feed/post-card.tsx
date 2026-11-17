@@ -6,8 +6,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { IconButton } from "@/components/ui/icon-button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { MentionTextarea } from "./mention-textarea";
-import { MentionText } from "./mention-text";
 import { PostActions } from "./post-actions";
+import { PostText } from "./post-text";
 import { AvatarCircles } from "@/components/ui/avatar-circles";
 import { EditHistory } from "./edit-history";
 import { cn } from "@/lib/utils";
@@ -298,7 +298,7 @@ export function PostCard({
                 focused ? "text-base" : "text-sm",
               )}
             >
-              <MentionText post={post} />
+              <PostText post={post} />
             </p>
           )}
           <PostActions post={post} feed={feed} />

@@ -32,6 +32,8 @@ import { Account } from "@/features/auth/account";
 import { useAuth, type AuthState } from "@/features/auth/use-auth";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Thread } from "@/features/feed/thread";
+import { TopicPage } from "@/features/topics/topic-page";
+import { isTopicName, normalizeTopic } from "@/lib/topics";
 import { ProfilePage } from "@/features/profile/profile";
 import type { Session } from "@/lib/api";
 import { useFeed } from "@/features/feed/use-feed";
@@ -167,6 +169,10 @@ function AppShell() {
                 element={<PostRoute session={auth.session} />}
               />
               <Route
+                path="/topics/:topic"
+                element={<TopicRoute session={auth.session} />}
+              />
+              <Route
                 path="/:profileHandle"
                 element={
                   <ProfileRoute
@@ -261,6 +267,15 @@ function LoginRoute({ session }: { session: Session | null }) {
   return session?.authenticated && !session.needsOnboarding ? (
     <Navigate to="/" replace />
   ) : null;
+}
+function TopicRoute({ session }: { session: Session | null }) {
+  const { topic = "" } = useParams();
+  const name = normalizeTopic(topic);
+  return isTopicName(name) ? (
+    <TopicPage key={name} topic={name} session={session} />
+  ) : (
+    <NotFound />
+  );
 }
 function PostRoute({ session }: { session: Session | null }) {
   const { id = "" } = useParams();
