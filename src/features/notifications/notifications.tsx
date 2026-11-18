@@ -4,6 +4,7 @@ import {
   CheckCheck,
   Heart,
   MessageCircle,
+  Quote,
   Repeat2,
   UserPlus,
   X,
@@ -36,6 +37,12 @@ const kinds = {
     text: "reposted your post",
     color:
       "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400",
+  },
+  quote: {
+    icon: Quote,
+    text: "quoted your post",
+    color:
+      "bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400",
   },
   reply: {
     icon: MessageCircle,

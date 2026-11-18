@@ -115,7 +115,10 @@ function FeedItem({ post, feed }: { post: Post; feed: FeedState }) {
     const resolved = feed.resolvePost(ancestor);
     return resolved ? [resolved] : [];
   });
-  if (ancestors.length === 0) return <PostCard post={post} feed={feed} />;
+  const repost = feed.repostContext(post);
+  if (ancestors.length === 0) {
+    return <PostCard post={post} feed={feed} repost={repost} replyContext />;
+  }
   const collapse = ancestors.length > MAX_SHOWN_ANCESTORS;
   const items: ({ ancestor: Post } | { gap: number })[] = collapse
     ? [
@@ -152,7 +155,7 @@ function FeedItem({ post, feed }: { post: Post; feed: FeedState }) {
           />
         ),
       )}
-      <PostCard post={post} feed={feed} connectFromPrev />
+      <PostCard post={post} feed={feed} repost={repost} connectFromPrev />
     </div>
   );
 }
