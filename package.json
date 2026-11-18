@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "test": "playwright test",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -31,6 +32,7 @@
     "linkifyjs": "^4.4.0",
     "lucide-react": "^1.70.0",
     "react": "^19.3.1",
+    "react-audio-visualize": "^1.2.0",
     "react-day-picker": "^10.0.2",
     "react-dom": "^19.3.1",
     "react-resizable-panels": "^4.19.1",
@@ -44,6 +46,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10",
+    "@playwright/test": "^1.65.1",
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",

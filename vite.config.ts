@@ -12,6 +12,9 @@ const proxy = {
 export default defineConfig({
   server: { port: 3000, strictPort: true, proxy },
   preview: { port: 3000, strictPort: true, proxy },
+  // Serve the patched visualizer directly so a running dev server cannot
+  // keep an older prebundle that never signals the waveform reveal.
+  optimizeDeps: { exclude: ["react-audio-visualize"] },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

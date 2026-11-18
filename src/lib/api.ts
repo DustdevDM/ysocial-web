@@ -51,6 +51,13 @@ const repostContextSchema = z.object({
 export type RepostContext = z.infer<typeof repostContextSchema>;
 const repostedBySchema = z.record(z.string(), repostContextSchema).default({});
 const postGifSchema = z.object({ url: z.string(), title: z.string() });
+const voiceSchema = z.object({
+  url: z.string(), durationMs: z.number().int().min(2000).max(120000), bytes: z.number().int().positive(),
+  waveform: z.array(z.number().int().min(0).max(100)).length(48).optional(),
+});
+const voiceDraftSchema = voiceSchema.extend({ token: z.string() });
+const voiceJobSchema = z.union([voiceDraftSchema, z.object({ pending: z.literal(true) })]);
+export type VoiceDraft = z.infer<typeof voiceDraftSchema>;
 export const pollDraftSchema = z.object({
   title: z.string().trim().min(1).max(120),
   options: z
@@ -82,6 +89,7 @@ const basePostSchema = z.object({
   parentId: z.string().nullable(),
   content: z.string(),
   gif: postGifSchema.nullable().default(null),
+  voice: voiceSchema.nullable().default(null),
   poll: pollSchema.nullable().default(null),
   createdAt: z.string(),
   editedAt: z.string().nullable(),
@@ -268,6 +276,15 @@ const traceCodes: Record<string, number> = {
   invalid_banner_crop: 5007,
   banner_not_found: 5008,
   avatar_in_use: 5009,
+  invalid_voice: 5010,
+  voice_too_short: 5011,
+  voice_too_long: 5012,
+  invalid_voice_selection: 5013,
+  voice_audio_required: 5014,
+  voice_not_found: 5015,
+  voice_processing_unavailable: 5016,
+  voice_processing_busy: 5017,
+  voice_not_configured: 5018,
   // gif
   invalid_gif_selection: 6001,
   invalid_search: 6002,
@@ -307,7 +324,29 @@ export class ApiError extends Error {
   }
 }
 
-// Only transport failures are retried. Validation and authorization errors
+export function waitForRetry(delay: number, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  return new Promise<void>((resolve, reject) => {
+    function cleanup() {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      window.removeEventListener("online", resume);
+    }
+    function resume() {
+      cleanup();
+      resolve();
+    }
+    function abort() {
+      cleanup();
+      reject(signal?.reason);
+    }
+    const timer = setTimeout(resume, delay);
+    signal?.addEventListener("abort", abort, { once: true });
+    window.addEventListener("online", resume, { once: true });
+  });
+}
+
+// Only transport and temporary capacity failures are retried. Validation and authorization errors
 // still reach the caller so the user can act on them.
 export async function retryRequest<T>(
   operation: () => Promise<T>,
@@ -315,10 +354,12 @@ export async function retryRequest<T>(
     context,
     signal,
     beforeRetry,
+    maxDelayMs = 30_000,
   }: {
     context: string;
     signal?: AbortSignal;
     beforeRetry?: () => Promise<void>;
+    maxDelayMs?: number;
   },
 ): Promise<T> {
   let attempt = 0;
@@ -331,13 +372,17 @@ export async function retryRequest<T>(
         return await operation();
       } catch (error) {
         signal?.throwIfAborted();
-        if (
-          !(error instanceof ApiError) ||
-          ![0, 408, 500, 502, 503, 504].includes(error.status)
-        )
-          throw error;
-        finishRetry ??= beginConnectionRetry();
-        const delay = Math.min(1000 * 2 ** Math.min(attempt++, 5), 30_000);
+        if (!(error instanceof ApiError)) throw error;
+        const voiceProcessorBusy =
+          error.status === 429 && error.message === "voice_processing_busy";
+        if (voiceProcessorBusy) {
+          finishRetry?.();
+          finishRetry = undefined;
+        } else {
+          if (![0, 408, 425, 500, 502, 503, 504].includes(error.status)) throw error;
+          finishRetry ??= beginConnectionRetry();
+        }
+        const delay = Math.min(1000 * 2 ** Math.min(attempt++, 5), maxDelayMs);
         if (import.meta.env.DEV)
           console.debug("[api] Retrying in the background", {
             context,
@@ -345,17 +390,7 @@ export async function retryRequest<T>(
             delay,
             error,
           });
-        await new Promise<void>((resolve, reject) => {
-          const onAbort = () => {
-            clearTimeout(timer);
-            reject(signal?.reason);
-          };
-          const timer = setTimeout(() => {
-            signal?.removeEventListener("abort", onAbort);
-            resolve();
-          }, delay);
-          signal?.addEventListener("abort", onAbort, { once: true });
-        });
+        await waitForRetry(delay, signal);
       }
     }
   } finally {
@@ -368,6 +403,15 @@ function friendlyMessage(error: unknown) {
       return "Your session expired. Sign in to continue.";
     if (error.message === "onboarding_required")
       return "Choose your handle to continue.";
+    if (error.message === "voice_too_short") return "Record at least 2 seconds.";
+    if (error.message === "voice_too_long") return "Voice messages can be at most 2 minutes long.";
+    if (error.message === "invalid_voice" || error.message === "voice_audio_required")
+      return "This recording could not be read. Please record it again.";
+    if (error.message === "voice_job_not_found") return "This recording expired. Please record it again.";
+    if (error.message === "invalid_voice_selection")
+      return "This recording expired or was already used. Please record it again.";
+    if (error.status === 413 && error.endpoint?.includes("/api/voices"))
+      return "This recording exceeds the 8 MB upload limit. Please record a shorter message.";
     if (error.message === "edit_window_expired")
       return "The 15-minute edit window has expired.";
     if (error.message === "profile_not_found")
@@ -442,6 +486,7 @@ async function sendRequest<T>(
   method = "GET",
   body?: unknown,
   signal?: AbortSignal,
+  headers?: Record<string, string>,
 ): Promise<T> {
   const response = await fetch(path, {
     method,
@@ -450,8 +495,9 @@ async function sendRequest<T>(
     signal,
     headers:
       body === undefined
-        ? undefined
+        ? headers
         : {
+            ...headers,
             "Content-Type":
               body instanceof Blob
                 ? body.type || "application/octet-stream"
@@ -464,6 +510,8 @@ async function sendRequest<T>(
           ? body
           : JSON.stringify(body),
   }).catch((error: unknown) => {
+    if (signal?.reason instanceof DOMException && signal.reason.name === "TimeoutError")
+      throw new ApiError(408, "request_timeout", `${method} ${path}`);
     signal?.throwIfAborted();
     if (error instanceof TypeError)
       throw new ApiError(0, "network_unavailable");
@@ -483,9 +531,13 @@ async function sendRequest<T>(
     console.error(`[ysocial] ${error.traceCode}`, error.endpoint);
     throw error;
   }
-  return schema.parse(
-    response.status === 204 ? undefined : await response.json(),
-  );
+  const data: unknown = response.status === 204 ? undefined : await response.json().catch(() => {
+    if (signal?.reason instanceof DOMException && signal.reason.name === "TimeoutError")
+      throw new ApiError(408, "request_timeout", `${method} ${path}`);
+    signal?.throwIfAborted();
+    throw new ApiError(502, "unexpected_response", `${method} ${path}`);
+  });
+  return schema.parse(data);
 }
 function request<T>(
   path: string,
@@ -500,6 +552,10 @@ function request<T>(
   return method === "GET" || path === "/api/banners/gifs/search"
     ? retryRequest(send, { context: `${method} ${path}`, signal })
     : send();
+}
+function attemptSignal(ms: number, signal?: AbortSignal) {
+  const timeout = AbortSignal.timeout(ms);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 const postPath = (id: string) => `/api/posts/${encodeURIComponent(id)}`;
 export const api = {
@@ -574,6 +630,9 @@ export const api = {
       profile,
       signal,
     ),
+  sessionOnce: (signal?: AbortSignal) =>
+    sendRequest("/auth/me", sessionSchema, "GET", undefined,
+      attemptSignal(5000, signal)),
   session: (signal?: AbortSignal) =>
     request("/auth/me", sessionSchema, "GET", undefined, signal),
   onboard: (handle: string) =>
@@ -759,20 +818,41 @@ export const api = {
       undefined,
       signal,
     ),
+  uploadVoice: (audio: Blob, id: string) =>
+    sendRequest("/api/voices", voiceJobSchema, "POST", audio, AbortSignal.timeout(25_000), {
+      "Idempotency-Key": id,
+    }),
+  voiceJob: async (id: string, signal: AbortSignal) => {
+    try {
+      return await sendRequest(`/api/voices/jobs/${id}`, voiceJobSchema, "GET", undefined,
+        attemptSignal(10_000, signal));
+    } catch (error) {
+      // A replica from the previous release may still be draining.
+      if (error instanceof ApiError && error.status === 404 && error.message === "route_not_found")
+        throw new ApiError(503, "voice_processing_unavailable", error.endpoint);
+      throw error;
+    }
+  },
+  cancelVoiceJob: (id: string, signal?: AbortSignal) =>
+    request(`/api/voices/jobs/${id}`, z.undefined(), "DELETE", undefined, attemptSignal(10_000, signal)),
+  discardVoice: (token: string, signal?: AbortSignal) =>
+    request("/api/voices", z.undefined(), "DELETE", { token }, attemptSignal(10_000, signal)),
   publish: (
     content: string,
     clientId?: string,
     gifToken?: string,
     poll?: PollDraft,
     quotedPostId?: string,
+    voiceToken?: string,
   ) =>
     request("/api/posts", postResponseSchema, "POST", {
       content,
       clientId,
       gifToken,
+      voiceToken,
       poll,
       quotedPostId,
-    }),
+    }, voiceToken ? AbortSignal.timeout(15_000) : undefined),
   replies: (id: string, cursor?: string, signal?: AbortSignal) =>
     request(
       `${postPath(id)}/replies${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
@@ -787,13 +867,15 @@ export const api = {
     clientId?: string,
     gifToken?: string,
     poll?: PollDraft,
+    voiceToken?: string,
   ) =>
     request(`${postPath(id)}/replies`, postResponseSchema, "POST", {
       content,
       clientId,
       gifToken,
+      voiceToken,
       poll,
-    }),
+    }, voiceToken ? AbortSignal.timeout(15_000) : undefined),
   vote: (id: string, optionIndex: number) =>
     request(
       `${postPath(id)}/poll/vote`,

@@ -5,6 +5,7 @@ import {
   retryRequest,
   type GifSearchItem,
   type PollDraft,
+  type VoiceDraft,
   type Post,
 } from "@/lib/api";
 import { beginReply, rememberPosts } from "./optimistic-actions";
@@ -48,6 +49,7 @@ export function publishOptimistically({
   content,
   gif,
   poll,
+  voice,
   author,
   parentId,
   quoting,
@@ -56,6 +58,7 @@ export function publishOptimistically({
   content: string;
   gif: GifSearchItem | null;
   poll?: PollDraft;
+  voice?: VoiceDraft;
   author: Post["author"];
   parentId: string | null;
   /** The post being quoted. A quote is always a top-level post. */
@@ -67,6 +70,7 @@ export function publishOptimistically({
     id: crypto.randomUUID(),
     content,
     gif: gif ? { url: gif.url, title: gif.title } : null,
+    voice: voice ?? null,
     poll: poll
       ? {
           ...poll,
@@ -107,7 +111,7 @@ export function publishOptimistically({
     ]);
     try {
       async function verifyAccount() {
-        const session = await api.session();
+        const session = voice ? await api.sessionOnce() : await api.session();
         if (
           !session.authenticated ||
           session.needsOnboarding ||
@@ -119,11 +123,12 @@ export function publishOptimistically({
       const { post } = await retryRequest(
         () =>
           parentId
-            ? api.reply(parentId, content, optimistic.id, gif?.token, poll)
-            : api.publish(content, optimistic.id, gif?.token, poll, quoting?.id),
+            ? api.reply(parentId, content, optimistic.id, gif?.token, poll, voice?.token)
+            : api.publish(content, optimistic.id, gif?.token, poll, quoting?.id, voice?.token),
         {
           context: parentId ? "publish reply" : "publish post",
           beforeRetry: verifyAccount,
+          maxDelayMs: voice ? 3000 : undefined,
         },
       );
       confirmed = post;

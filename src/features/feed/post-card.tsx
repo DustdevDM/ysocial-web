@@ -1,3 +1,4 @@
+import { PublishedVoicePlayer } from "./voice-player";
 import { useEffect, useId, useRef, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import { formatDistance } from "date-fns";
@@ -78,10 +79,10 @@ export function PostCard({
     ? renderShortcodes(content, emojiIndex)
     : content;
   const length = Array.from(finalContent.trim()).length;
-  const hasAttachment = Boolean(post.gif || post.poll);
+  const hasAttachment = Boolean(post.gif || post.poll || post.voice);
   const validCaption = (length > 0 || hasAttachment) && length <= 2000;
   const changed = finalContent.trim() !== post.content.trim();
-  const jumbo = post.gif ? 0 : emojiOnlyCount(post.content);
+  const jumbo = post.gif || post.voice ? 0 : emojiOnlyCount(post.content);
   const profilePath = `/@${post.author.handle}`;
   const openable = !focused && !optimistic && !editing;
   const openTimer = useRef<number | undefined>(undefined);
@@ -360,6 +361,14 @@ export function PostCard({
                 )}
               />
             )
+          )}
+          {post.voice && (
+            <PublishedVoicePlayer
+              url={post.voice.url}
+              durationMs={post.voice.durationMs}
+              peaks={post.voice.waveform}
+              pending={optimistic}
+            />
           )}
           {post.gif && (
             <img

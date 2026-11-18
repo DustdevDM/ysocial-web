@@ -19,9 +19,11 @@ import {
   type GifSearchItem,
   type PollDraft,
   type Post,
+  type VoiceDraft,
 } from "@/lib/api";
 import { QuotedPostCard } from "./quoted-post";
 import { quoteOf } from "./quote";
+import { VoiceRecorder } from "./voice-recorder";
 import { splitWrittenTopics } from "@/lib/topics";
 import { renderShortcodes } from "@/lib/emoji";
 import { useEmojiIndex } from "@/lib/use-emoji-index";
@@ -157,6 +159,9 @@ function AuthenticatedPostComposer({
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
   const [gif, setGif] = useState<GifSearchItem | null>(null);
   const [poll, setPoll] = useState<PollDraft | null>(null);
+  const [voice, setVoice] = useState<VoiceDraft>();
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceKey, setVoiceKey] = useState(0);
   // Kept here, not in the feed state: typing must not re-render every post.
   const [draft, setDraft] = useState("");
   const [height, setHeight] = useState<number>();
@@ -180,7 +185,8 @@ function AuthenticatedPostComposer({
   const parsedPoll = poll ? pollDraftSchema.safeParse(poll) : null;
   const valid =
     feed.canPost &&
-    (length > 0 || gif !== null || poll !== null) &&
+    !voiceBusy &&
+    (length > 0 || gif !== null || poll !== null || voice !== undefined) &&
     length <= LIMIT &&
     (parsedPoll === null || parsedPoll.success);
 
@@ -228,10 +234,12 @@ function AuthenticatedPostComposer({
   function publish() {
     if (!valid) return;
     const started = quote
-      ? feed.publishQuote(quote, finalDraft, gif, parsedPoll?.data, onConfirmed)
-      : feed.publishPost(finalDraft, gif, parsedPoll?.data);
+      ? feed.publishQuote(quote, finalDraft, gif, parsedPoll?.data, onConfirmed, voice)
+      : feed.publishPost(finalDraft, gif, parsedPoll?.data, voice);
     if (!started) return;
     onSubmitted?.();
+    setVoice(undefined);
+    setVoiceKey((key) => key + 1);
     setGif(null);
     setPoll(null);
     textarea.current?.blur();
@@ -395,47 +403,57 @@ function AuthenticatedPostComposer({
               disabled={!feed.canPost}
             />
           )}
-          <div className="ml-auto flex shrink-0 items-center gap-1">
-            <LimitRing length={length} />
-            {!poll && (
-              <IconButton
-                label="Add poll"
-                type="button"
-                className="rounded-full text-muted-foreground"
-                disabled={!feed.canPost}
-                onClick={() =>
-                  setPoll({
-                    title: "",
-                    options: ["", ""],
-                    anonymous: false,
-                  })
-                }
-              >
-                <ChartNoAxesColumn aria-hidden="true" />
-              </IconButton>
-            )}
-            <DialogTrigger
-              render={
+          <VoiceRecorder
+            key={voiceKey}
+            userId={feed.viewerId}
+            disabled={!feed.canPost}
+            onChange={setVoice}
+            onBusyChange={setVoiceBusy}
+            renderToolbar={(recordButton) => (
+              <div className="ml-auto flex shrink-0 items-center gap-1">
+                <LimitRing length={length} />
+                {!poll && (
+                  <IconButton
+                    label="Add poll"
+                    type="button"
+                    className="rounded-full text-muted-foreground"
+                    disabled={!feed.canPost}
+                    onClick={() =>
+                      setPoll({
+                        title: "",
+                        options: ["", ""],
+                        anonymous: false,
+                      })
+                    }
+                  >
+                    <ChartNoAxesColumn aria-hidden="true" />
+                  </IconButton>
+                )}
+                {recordButton}
+                <DialogTrigger
+                  render={
+                    <IconButton
+                      label={gif ? "Change GIF" : "Add GIF"}
+                      type="button"
+                      disabled={!feed.canPost}
+                      className="rounded-full text-muted-foreground"
+                    />
+                  }
+                >
+                  <span className="text-[10px] font-semibold">GIF</span>
+                </DialogTrigger>
                 <IconButton
-                  label={gif ? "Change GIF" : "Add GIF"}
-                  type="button"
-                  disabled={!feed.canPost}
-                  className="rounded-full text-muted-foreground"
-                />
-              }
-            >
-              <span className="text-[10px] font-semibold">GIF</span>
-            </DialogTrigger>
-            <IconButton
-              label={quote ? "Publish quote" : "Publish post"}
-              type="submit"
-              variant="default"
-              className="rounded-full"
-              disabled={!valid}
-            >
-              <ArrowUp />
-            </IconButton>
-          </div>
+                  label={quote ? "Publish quote" : "Publish post"}
+                  type="submit"
+                  variant="default"
+                  className="rounded-full"
+                  disabled={!valid}
+                >
+                  <ArrowUp />
+                </IconButton>
+              </div>
+            )}
+          />
           <p id={helpId} className="sr-only">
             {feed.canPost
               ? "Enter adds a new line. Press Ctrl+Enter or Command+Enter to post. Maximum 2000 characters."

@@ -1,0 +1,305 @@
+diff --git a/dist/AudioVisualizer/AudioVisualizer.d.ts b/dist/AudioVisualizer/AudioVisualizer.d.ts
+index b42a25231148602ded731a77c47f768d2b8f21b8..ba95c3f4045ab50cc00755ad5c5f746dbe9bb8c8 100644
+--- a/dist/AudioVisualizer/AudioVisualizer.d.ts
++++ b/dist/AudioVisualizer/AudioVisualizer.d.ts
+@@ -3,7 +3,11 @@ interface Props {
+     /**
+      * Audio blob to visualize
+      */
+-    blob: Blob;
++    blob?: Blob;
++    /** Precomputed amplitude levels (0–100), in playback order. */
++    peaks?: number[];
++    /** Playback duration in seconds when supplying precomputed peaks. */
++    duration?: number;
+     /**
+      * Width of the visualizer
+      */
+@@ -37,6 +41,8 @@ interface Props {
+      * Visualized bars that fall before the current time will have `barPlayerColor`, while that ones that fall after will have `barColor`
+      */
+     currentTime?: number;
++    /** Reports whether the decoded waveform could be drawn. */
++    onWaveformRender?: (painted: boolean) => void;
+     /**
+      * Custome styles that can be passed to the visualization canvas
+      */
+diff --git a/dist/react-audio-visualize.es.js b/dist/react-audio-visualize.es.js
+index 678dce2b23ba60b8f3594b60f43294b58219f735..e67fc805a76d95bf2206a216d2581256ab5da674 100644
+--- a/dist/react-audio-visualize.es.js
++++ b/dist/react-audio-visualize.es.js
+@@ -624,8 +624,8 @@ Check the top-level render call using <` + t + ">.");
+     B.Fragment = R, B.jsx = cr, B.jsxs = lr;
+   }()), B;
+ }
+-process.env.NODE_ENV === "production" ? oe.exports = pr() : oe.exports = mr();
+-var Ie = oe.exports;
++// Use the host JSX runtime (the bundled React 18 runtime cannot run on React 19).
++import * as Ie from "react/jsx-runtime";
+ const hr = (f, d, C, R) => {
+   let h = d / (C + R), E = Math.floor(f.length / h);
+   h > f.length && (h = f.length, E = 1);
+@@ -641,7 +641,8 @@ const hr = (f, d, C, R) => {
+   const w = d.height / 2, s = d.getContext("2d");
+   s && (s.clearRect(0, 0, d.width, d.height), h !== "transparent" && (s.fillStyle = h, s.fillRect(0, 0, d.width, d.height)), f.forEach((c, p) => {
+     s.fillStyle = E;
+-    const i = p * (C + R), a = w - c / 2, y = C, S = c || 1;
++    const S = Math.max(1, c / 255 * (d.height - 2));
++    const i = p * (C + R), a = w - S / 2, y = C;
+     s.beginPath(), s.roundRect ? (s.roundRect(i, a, y, S, 50), s.fill()) : s.fillRect(i, a, y, S);
+   }));
+ }, _r = ({
+@@ -657,46 +658,40 @@ const hr = (f, d, C, R) => {
+   minDecibels: p = -90,
+   smoothingTimeConstant: i = 0.4
+ }) => {
+-  const [a, y] = U(), [S, j] = U(), [_, k] = U(), O = Fe(null);
++  const O = Fe(null);
+   z(() => {
+-    if (!f.stream)
++    if (f.state !== "recording" || typeof AudioContext === "undefined")
+       return;
+-    const g = new AudioContext(), D = g.createAnalyser();
+-    k(D), D.fftSize = s, D.minDecibels = p, D.maxDecibels = c, D.smoothingTimeConstant = i;
+-    const N = g.createMediaStreamSource(f.stream);
+-    return N.connect(D), y(g), j(N), () => {
+-      N.disconnect(), D.disconnect(), g.state !== "closed" && g.close();
++    const context = new AudioContext();
++    const analyser = context.createAnalyser();
++    analyser.fftSize = s;
++    analyser.minDecibels = p;
++    analyser.maxDecibels = c;
++    analyser.smoothingTimeConstant = i;
++    const source = context.createMediaStreamSource(f.stream);
++    source.connect(analyser);
++    void context.resume().catch(() => {});
++    const samples = new Uint8Array(analyser.frequencyBinCount);
++    let frame;
++    const draw = () => {
++      if (!O.current || f.state !== "recording") return;
++      analyser.getByteFrequencyData(samples);
++      gr(hr(samples, O.current.width, R, h), O.current, R, h, E, w);
++      frame = requestAnimationFrame(draw);
+     };
+-  }, [f.stream]), z(() => {
+-    _ && f.state === "recording" && v();
+-  }, [_, f.state]);
+-  const v = fr(() => {
+-    if (!_ || !a)
+-      return;
+-    const g = new Uint8Array(_ == null ? void 0 : _.frequencyBinCount);
+-    f.state === "recording" ? (_ == null || _.getByteFrequencyData(g), b(g), requestAnimationFrame(v)) : f.state === "paused" ? b(g) : f.state === "inactive" && a.state !== "closed" && a.close();
+-  }, [_, a == null ? void 0 : a.state]);
+-  z(() => () => {
+-    a && a.state !== "closed" && a.close(), S == null || S.disconnect(), _ == null || _.disconnect();
+-  }, []);
+-  const b = (g) => {
+-    if (!O.current)
+-      return;
+-    const D = hr(
+-      g,
+-      O.current.width,
+-      R,
+-      h
+-    );
+-    gr(
+-      D,
+-      O.current,
+-      R,
+-      h,
+-      E,
+-      w
+-    );
+-  };
++    const stop = () => {
++      cancelAnimationFrame(frame);
++      if (context.state !== "closed") void context.close().catch(() => {});
++    };
++    f.addEventListener("stop", stop, { once: true });
++    draw();
++    return () => {
++      f.removeEventListener("stop", stop);
++      source.disconnect();
++      analyser.disconnect();
++      stop();
++    };
++  }, [f, s, p, c, i, R, h, E, w]);
+   return /* @__PURE__ */ Ie.jsx(
+     "canvas",
+     {
+@@ -708,29 +703,21 @@ const hr = (f, d, C, R) => {
+       }
+     }
+   );
+-}, yr = (f, d, C, R, h) => {
+-  const E = f.getChannelData(0), w = C / (R + h), s = Math.floor(E.length / w), c = d / 2;
+-  let p = [], i = 0;
+-  for (let a = 0; a < w; a++) {
+-    const y = [];
+-    let S = 0;
+-    const j = [];
+-    let _ = 0;
+-    for (let b = 0; b < s && a * s + b < f.length; b++) {
+-      const g = E[a * s + b];
+-      g <= 0 && (y.push(g), S++), g > 0 && (j.push(g), _++);
+-    }
+-    const k = y.reduce((b, g) => b + g, 0) / S, v = { max: j.reduce((b, g) => b + g, 0) / _, min: k };
+-    v.max > i && (i = v.max), Math.abs(v.min) > i && (i = Math.abs(v.min)), p.push(v);
+-  }
+-  if (c * 0.8 > i * c) {
+-    const a = c * 0.8 / i;
+-    p = p.map((y) => ({
+-      max: y.max * a,
+-      min: y.min * a
+-    }));
+-  }
+-  return p;
++}, yr = (audio, height, width, barWidth, gap) => {
++  const samples = audio.getChannelData(0);
++  const count = Math.max(1, Math.floor(width / (barWidth + gap)));
++  const levels = Array.from({ length: count }, (_, index) => {
++    const start = Math.floor(index * samples.length / count);
++    const end = Math.floor((index + 1) * samples.length / count);
++    let energy = 0;
++    for (let i = start; i < end; i++) energy += samples[i] ** 2;
++    return Math.sqrt(energy / Math.max(1, end - start));
++  });
++  const peak = Math.max(0.01, ...levels);
++  return levels.map((level) => {
++    const half = 1.5 + Math.pow(level / peak, 0.65) * (height * 0.35);
++    return { min: -half, max: half };
++  });
+ }, ie = (f, d, C, R, h, E, w, s = 0, c = 1) => {
+   const p = d.height / 2, i = d.getContext("2d");
+   if (!i)
+@@ -740,71 +727,68 @@ const hr = (f, d, C, R) => {
+   f.forEach((y, S) => {
+     const j = S / f.length, _ = a > j;
+     i.fillStyle = _ && w ? w : E;
+-    const k = S * (C + R), O = p + y.min, v = C, b = p + y.max - O;
+-    i.beginPath(), i.roundRect ? (i.roundRect(k, O, v, b, 50), i.fill()) : i.fillRect(k, O, v, b);
++    const k = S * (C + R), O = p + y.min, v = C, b = Math.max(1, p + y.max - O);
++    i.beginPath(), i.roundRect ? (i.roundRect(k, O, v, b, v / 2), i.fill()) : i.fillRect(k, O, v, b);
+   });
+ }, Rr = dr(
+   ({
+     blob: f,
++    peaks,
++    duration,
+     width: d,
+     height: C,
+     barWidth: R = 2,
+     gap: h = 1,
+     currentTime: E,
++    onWaveformRender: rendered,
+     style: w,
+     backgroundColor: s = "transparent",
+     barColor: c = "rgb(184, 184, 184)",
+     barPlayedColor: p = "rgb(160, 198, 255)"
+   }, i) => {
+-    const a = Fe(null), [y, S] = U([]), [j, _] = U(0);
++    const a = Fe(null), lastPainted = Fe(null), [y, S] = U([]), [j, _] = U(0);
+     return vr(
+       i,
+       () => a.current,
+       []
+     ), z(() => {
+-      (async () => {
+-        if (!a.current)
+-          return;
+-        if (!f) {
+-          const b = Array.from({ length: 100 }, () => ({
+-            max: 0,
+-            min: 0
+-          }));
+-          ie(
+-            b,
+-            a.current,
+-            R,
+-            h,
+-            s,
+-            c,
+-            p
+-          );
+-          return;
+-        }
+-        const O = await f.arrayBuffer();
+-        await new AudioContext().decodeAudioData(O, (b) => {
+-          if (!a.current)
+-            return;
+-          _(b.duration);
+-          const g = yr(
+-            b,
+-            C,
+-            d,
+-            R,
+-            h
+-          );
+-          S(g), ie(
+-            g,
+-            a.current,
+-            R,
+-            h,
+-            s,
+-            c,
+-            p
+-          );
+-        });
+-      })();
+-    }, [f, a.current]), z(() => {
++      if (peaks?.length) {
++        S(peaks.map((level) => {
++          const half = 1.5 + level / 100 * (C * 0.35);
++          return { min: -half, max: half };
++        }));
++        return;
++      }
++      if (!f) return;
++      if (typeof AudioContext === "undefined") {
++        rendered?.(false);
++        return;
++      }
++      const context = new AudioContext();
++      let active = true;
++      const abandon = () => {
++        active = false;
++        if (context.state !== "closed") void context.close().catch(() => {});
++      };
++      const deadline = setTimeout(() => {
++        abandon();
++        rendered?.(false);
++      }, 4000);
++      void f.arrayBuffer().then((buffer) => context.decodeAudioData(buffer)).then((decoded) => {
++        if (!active) return;
++        _(decoded.duration);
++        S(yr(decoded, C, d, R, h));
++      }).catch(() => {
++        if (active) rendered?.(false);
++      }).finally(() => {
++        clearTimeout(deadline);
++        abandon();
++      });
++      return () => {
++        clearTimeout(deadline);
++        abandon();
++      };
++    }, [f, peaks, C, d, R, h, rendered]), z(() => {
+       a.current && ie(
+         y,
+         a.current,
+@@ -814,9 +798,13 @@ const hr = (f, d, C, R) => {
+         c,
+         p,
+         E,
+-        j
++        duration || j
+       );
+-    }, [E, j]), /* @__PURE__ */ Ie.jsx(
++      if (a.current && y.length && lastPainted.current !== y) {
++        lastPainted.current = y;
++        rendered?.(true);
++      }
++    }, [E, duration, j, y, R, h, s, c, p, rendered]), /* @__PURE__ */ Ie.jsx(
+       "canvas",
+       {
+         ref: a,
