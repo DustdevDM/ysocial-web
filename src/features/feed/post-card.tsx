@@ -345,7 +345,11 @@ export function PostCard({
           )}
           {post.poll && (
             <PostPoll
+              postId={post.id}
               poll={post.poll}
+              viewerId={feed.viewerId}
+              live={!optimistic && !feed.sessionLoading}
+              promptLogin={!optimistic && !feed.sessionLoading && !feed.authenticated}
               canVote={feed.canPost && !optimistic}
               voting={feed.isVoting(post)}
               onVote={(optionIndex) => feed.vote(post, optionIndex)}
