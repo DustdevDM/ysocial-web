@@ -1,7 +1,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { ArrowUp, X } from "lucide-react";
+import { ArrowUp, ChartNoAxesColumn, Plus, X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogTrigger,
@@ -20,7 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { FeedState } from "./use-feed";
 import { GifPicker } from "@/features/gifs/gif-picker";
-import type { GifSearchItem } from "@/lib/api";
+import { pollDraftSchema, type GifSearchItem, type PollDraft } from "@/lib/api";
 import { splitWrittenTopics } from "@/lib/topics";
 import { renderShortcodes } from "@/lib/emoji";
 import { useEmojiIndex } from "@/lib/use-emoji-index";
@@ -149,6 +151,7 @@ function AuthenticatedPostComposer({
   const [published, setPublished] = useState(false);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
   const [gif, setGif] = useState<GifSearchItem | null>(null);
+  const [poll, setPoll] = useState<PollDraft | null>(null);
   // Kept here, not in the feed state: typing must not re-render every post.
   const [draft, setDraft] = useState("");
   const [height, setHeight] = useState<number>();
@@ -169,7 +172,12 @@ function AuthenticatedPostComposer({
   const emojiIndex = useEmojiIndex(focused);
   const finalDraft = emojiIndex ? renderShortcodes(draft, emojiIndex) : draft;
   const length = Array.from(finalDraft.trim()).length;
-  const valid = feed.canPost && (length > 0 || gif !== null) && length <= LIMIT;
+  const parsedPoll = poll ? pollDraftSchema.safeParse(poll) : null;
+  const valid =
+    feed.canPost &&
+    (length > 0 || gif !== null || poll !== null) &&
+    length <= LIMIT &&
+    (parsedPoll === null || parsedPoll.success);
 
   // A hidden copy of the text measures how tall the field needs to be, so the
   // visible one can animate between heights (field-sizing cannot transition).
@@ -210,8 +218,9 @@ function AuthenticatedPostComposer({
 
   function publish() {
     if (!valid) return;
-    if (!feed.publishPost(finalDraft, gif)) return;
+    if (!feed.publishPost(finalDraft, gif, parsedPoll?.data)) return;
     setGif(null);
+    setPoll(null);
     textarea.current?.blur();
     setDraft("");
     setPublished(true);
@@ -362,8 +371,36 @@ function AuthenticatedPostComposer({
               className={`${topics ? "text-transparent caret-foreground " : ""}absolute inset-0 h-full min-h-0 resize-none field-sizing-fixed rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 dark:bg-transparent dark:disabled:bg-transparent ${textClass}`}
             />
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          {poll && (
+            <PollFields
+              poll={poll}
+              onChange={setPoll}
+              onRemove={() => {
+                setPoll(null);
+                textarea.current?.focus();
+              }}
+              disabled={!feed.canPost}
+            />
+          )}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <LimitRing length={length} />
+            {!poll && (
+              <IconButton
+                label="Add poll"
+                type="button"
+                className="rounded-full text-muted-foreground"
+                disabled={!feed.canPost}
+                onClick={() =>
+                  setPoll({
+                    title: "",
+                    options: ["", ""],
+                    anonymous: false,
+                  })
+                }
+              >
+                <ChartNoAxesColumn aria-hidden="true" />
+              </IconButton>
+            )}
             <DialogTrigger
               render={
                 <IconButton
@@ -417,5 +454,108 @@ function AuthenticatedPostComposer({
         />
       )}
     </Dialog>
+  );
+}
+
+function PollFields({
+  poll,
+  onChange,
+  onRemove,
+  disabled,
+}: {
+  poll: PollDraft;
+  onChange: (poll: PollDraft) => void;
+  onRemove: () => void;
+  disabled: boolean;
+}) {
+  const labels = poll.options.map((option) => option.trim().toLowerCase());
+  const duplicates = labels.some((label, index) => label && labels.indexOf(label) !== index);
+  return (
+    <fieldset
+      disabled={disabled}
+      className="min-w-0 w-full space-y-2 rounded-2xl border border-border bg-background p-3 text-sm"
+    >
+      <legend className="sr-only">Poll</legend>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-medium">
+          <ChartNoAxesColumn className="size-4 text-muted-foreground" aria-hidden="true" />
+          Poll
+        </div>
+        <IconButton
+          label="Remove poll"
+          type="button"
+          size="icon-sm"
+          className="-mr-1 rounded-full text-muted-foreground"
+          disabled={disabled}
+          onClick={onRemove}
+        >
+          <X />
+        </IconButton>
+      </div>
+      <Input
+        aria-label="Poll title (required)"
+        placeholder="Poll title"
+        required
+        autoFocus
+        maxLength={120}
+        value={poll.title}
+        onChange={(event) => onChange({ ...poll, title: event.target.value })}
+      />
+      {poll.options.map((option, index) => (
+        <div key={index} className="flex items-center gap-1.5">
+          <Input
+            aria-label={`Option ${index + 1}`}
+            placeholder={`Option ${index + 1}`}
+            required
+            maxLength={80}
+            value={option}
+            aria-invalid={Boolean(labels[index] && labels.indexOf(labels[index]) !== index)}
+            onChange={(event) => {
+              const options = [...poll.options];
+              options[index] = event.target.value;
+              onChange({ ...poll, options });
+            }}
+          />
+          {index >= 2 && index === poll.options.length - 1 && (
+            <IconButton
+              label="Remove last option"
+              type="button"
+              size="icon-sm"
+              className="rounded-full text-muted-foreground"
+              disabled={disabled}
+              onClick={() => onChange({ ...poll, options: poll.options.slice(0, -1) })}
+            >
+              <X />
+            </IconButton>
+          )}
+        </div>
+      ))}
+      {duplicates && (
+        <p role="status" className="text-xs text-destructive">Give each option a different label.</p>
+      )}
+      {poll.options.length < 6 && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="rounded-full text-muted-foreground"
+          disabled={disabled}
+          onClick={() => onChange({ ...poll, options: [...poll.options, ""] })}
+        >
+          <Plus aria-hidden="true" />
+          Add option
+        </Button>
+      )}
+      <div className="space-y-1 border-t border-border pt-2 text-sm">
+        <label className="flex min-h-8 cursor-pointer items-center gap-2.5 px-1">
+          <Checkbox
+            checked={poll.anonymous}
+            disabled={disabled}
+            onCheckedChange={(anonymous) => onChange({ ...poll, anonymous })}
+          />
+          Anonymous voting
+        </label>
+      </div>
+    </fieldset>
   );
 }

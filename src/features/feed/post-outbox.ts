@@ -4,6 +4,7 @@ import {
   errorMessage,
   retryRequest,
   type GifSearchItem,
+  type PollDraft,
   type Post,
 } from "@/lib/api";
 import { beginReply, rememberPosts } from "./optimistic-actions";
@@ -45,12 +46,14 @@ export function acknowledgePosts(posts: Post[]) {
 export function publishOptimistically({
   content,
   gif,
+  poll,
   author,
   parentId,
   onConfirmed,
 }: {
   content: string;
   gif: GifSearchItem | null;
+  poll?: PollDraft;
   author: Post["author"];
   parentId: string | null;
   onConfirmed?: () => void;
@@ -60,6 +63,13 @@ export function publishOptimistically({
     id: crypto.randomUUID(),
     content,
     gif: gif ? { url: gif.url, title: gif.title } : null,
+    poll: poll
+      ? {
+          ...poll,
+          options: poll.options.map((label) => ({ label, votes: 0 })),
+          selectedOption: null,
+        }
+      : null,
     author,
     parentId,
     createdAt: now.toISOString(),
@@ -100,8 +110,8 @@ export function publishOptimistically({
       const { post } = await retryRequest(
         () =>
           parentId
-            ? api.reply(parentId, content, optimistic.id, gif?.token)
-            : api.publish(content, optimistic.id, gif?.token),
+            ? api.reply(parentId, content, optimistic.id, gif?.token, poll)
+            : api.publish(content, optimistic.id, gif?.token, poll),
         {
           context: parentId ? "publish reply" : "publish post",
           beforeRetry: verifyAccount,
