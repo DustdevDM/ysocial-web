@@ -29,7 +29,7 @@ const pollSchema = pollDraftSchema.extend({
 });
 export type PollDraft = z.infer<typeof pollDraftSchema>;
 export type Poll = z.infer<typeof pollSchema>;
-const postSchema = z.object({
+const basePostSchema = z.object({
   mentions: z
     .array(
       z.object({ id: z.string(), handle: z.string(), username: z.string() }),
@@ -54,6 +54,10 @@ const postSchema = z.object({
   friendLikers: z.array(userSchema).default([]),
   // Normalized topics (#name) in the post or reply.
   topics: z.array(z.string()).default([]),
+});
+const postSchema = basePostSchema.extend({
+  // Topic pages only: the posts above a reply, root first.
+  ancestors: z.array(basePostSchema).optional(),
 });
 const topicCountSchema = z.object({ name: z.string(), count: z.number() });
 const pageSchema = z.object({
