@@ -35,6 +35,7 @@ import {
 import { BannerImage } from "./banner-image";
 import { BannerEditor } from "./banner-editor";
 import { AvatarCropper } from "./avatar-cropper";
+import { RecentAvatars } from "./recent-avatars";
 import { ProfileForm } from "./profile-form";
 import { PostCard } from "@/features/feed/post-card";
 import { useFeed } from "@/features/feed/use-feed";
@@ -112,7 +113,8 @@ export function ProfilePage({
               (post) =>
                 !ownProfile ||
                 post.reposted ||
-                (post.quote !== null && post.author.id === loadedProfile.profile.id),
+                (post.quote !== null &&
+                  post.author.id === loadedProfile.profile.id),
             ),
           replies: loadedProfile.replies.flatMap((reply) => {
             const post = feed.resolvePost(reply.post);
@@ -268,6 +270,33 @@ export function ProfilePage({
                     </DialogDescription>
                   </DialogHeader>
                   <AvatarCropper
+                    emptyFooter={
+                      <RecentAvatars
+                        onSelect={async (id, signal) => {
+                          await verifyAccount(signal);
+                          const result = await api.selectRecentAvatar(
+                            id,
+                            signal,
+                          );
+                          setProfile((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  profile: {
+                                    ...current.profile,
+                                    avatarUrl: result.avatarUrl,
+                                  },
+                                }
+                              : current,
+                          );
+                          updateAuthor(profile.profile.id, {
+                            avatarUrl: result.avatarUrl,
+                          });
+                          onAvatarSaved(profile.profile.id, result.avatarUrl);
+                          setPictureDialogOpen(false);
+                        }}
+                      />
+                    }
                     onSave={async (picture, signal) => {
                       const result = await retryRequest(
                         () => api.uploadAvatar(picture, signal),
