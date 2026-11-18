@@ -22,11 +22,27 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil((async () => {
     const target = new URL(event.notification.data?.url || "/notifications", self.location.origin);
     if (target.origin !== self.location.origin) return;
-    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    const client = clients.find((item) => new URL(item.url).origin === target.origin);
-    if (client) {
-      await client.navigate(target.href);
-      await client.focus();
-    } else await self.clients.openWindow(target.href);
+    const id = event.notification.tag;
+    const read = id && id !== "ysocial"
+      ? fetch(`/api/notifications/${encodeURIComponent(id)}/read`, {
+          method: "PUT",
+          credentials: "same-origin",
+          mode: "same-origin",
+        }).then((response) => response.ok, () => false)
+      : false;
+
+    try {
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const client = clients.find((item) => new URL(item.url).origin === target.origin);
+      if (client) {
+        await client.navigate(target.href);
+        await client.focus();
+      } else await self.clients.openWindow(target.href);
+    } finally {
+      if (await read) {
+        const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const client of clients) client.postMessage({ type: "notifications-updated" });
+      }
+    }
   })());
 });
