@@ -2,7 +2,11 @@ import { Fragment } from "react";
 import { Link } from "react-router";
 import type { Post } from "@/lib/api";
 
-export function MentionText({ post }: { post: Post }) {
+export function MentionText({
+  post,
+}: {
+  post: Pick<Post, "content" | "mentions">;
+}) {
   const targets = new Map(
     post.mentions.map((mention) => [mention.username, mention]),
   );

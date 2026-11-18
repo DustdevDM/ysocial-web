@@ -43,7 +43,7 @@ export function ActionMenu({
   items: ActionMenuItem[];
   /** Keep the title for screen readers only, without a visible heading. */
   hideTitle?: boolean;
-  /** Bigger, easier to hit rows. */
+  /** Bigger, easier to hit rows in the mobile drawer. Desktop menus stay compact. */
   large?: boolean;
 }) {
   const mobile = useIsMobile();
@@ -98,7 +98,7 @@ export function ActionMenu({
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className={large ? "w-64 p-1.5" : "w-52"}
+        className="w-52"
       >
         <DropdownMenuGroup aria-label={typeof title === "string" ? title : undefined}>
           {title && !hideTitle && <DropdownMenuLabel>{title}</DropdownMenuLabel>}
@@ -108,11 +108,6 @@ export function ActionMenu({
               <DropdownMenuItem
                 disabled={item.disabled}
                 variant={item.destructive ? "destructive" : "default"}
-                className={
-                  large
-                    ? "min-h-12 gap-3 rounded-lg px-3 py-2.5 text-base [&_svg:not([class*='size-'])]:size-5"
-                    : undefined
-                }
                 render={
                   item.kind === "link" ? (
                     <Link to={item.to} reloadDocument={item.reloadDocument} />
