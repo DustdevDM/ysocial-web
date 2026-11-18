@@ -801,6 +801,17 @@ export const api = {
       "PUT",
       { optionIndex },
     ),
+  postStates: (ids: string[], signal: AbortSignal) =>
+    sendRequest(
+      `/api/posts/states?ids=${encodeURIComponent(ids.join(","))}`,
+      z.object({
+        viewerId: z.string().nullable(),
+        posts: z.array(postSchema),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
   pollResults: (ids: string[], signal: AbortSignal) =>
     sendRequest(
       `/api/posts/poll-results?ids=${encodeURIComponent(ids.join(","))}`,

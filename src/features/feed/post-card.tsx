@@ -25,6 +25,7 @@ import {
 } from "@/lib/emoji";
 import { useEmojiIndex } from "@/lib/use-emoji-index";
 import type { FeedState } from "./use-feed";
+import { watchPost } from "./live-states";
 
 export function PostCard({
   post,
@@ -64,6 +65,11 @@ export function PostCard({
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
+  const articleRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const element = articleRef.current;
+    return element ? watchPost(element, post.id, feed.viewerId) : undefined;
+  }, [post.id, feed.viewerId]);
   const optimistic = feed.optimisticPostIds.includes(post.id);
   const mine = post.author.id === feed.viewerId;
   const busy = feed.pending.includes(post.id);
@@ -125,6 +131,7 @@ export function PostCard({
   }
   return (
     <article
+      ref={articleRef}
       id={`post-${post.id}`}
       onClick={openPost}
       className={cn(
