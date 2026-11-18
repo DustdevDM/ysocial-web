@@ -65,6 +65,29 @@ const postResponseSchema = z.object({
   post: postSchema,
   serverNow: z.string(),
 });
+const websiteLinkSchema = z.object({
+  href: z.string(),
+  title: z.string(),
+  iconKey: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+});
+const imagePreviewKeySchema = z.string().regex(/^[0-9a-f]{64}$/);
+const pagePreviewSchema = websiteLinkSchema.extend({
+  kind: z.literal("website").default("website"),
+  description: z.string().optional(),
+  siteName: z.string(),
+  imageKey: imagePreviewKeySchema.optional(),
+});
+const websitePreviewSchema = z.union([
+  pagePreviewSchema,
+  websiteLinkSchema.extend({ kind: z.literal("image"), imageKey: imagePreviewKeySchema }),
+]);
+const websitePreviewsSchema = z.object({
+  links: z.array(websiteLinkSchema).default([]),
+  previews: z.array(websitePreviewSchema),
+  nextOffset: z.number().int().nonnegative().optional(),
+});
+export type WebsitePreview = z.infer<typeof websitePreviewSchema>;
+export type WebsiteLink = z.infer<typeof websiteLinkSchema>;
 const threadSchema = z.object({
   post: postSchema,
   ancestors: z.array(postSchema),
@@ -577,6 +600,20 @@ export const api = {
     ),
   post: (id: string, signal?: AbortSignal) =>
     request(postPath(id), postResponseSchema, "GET", undefined, signal),
+  postPreview: (id: string, signal: AbortSignal) =>
+    sendRequest(postPath(id), postResponseSchema, "GET", undefined, signal),
+  websitePreviews: (id: string, offset: number, signal: AbortSignal) =>
+    sendRequest(
+      `${postPath(id)}/link-previews${offset ? `?offset=${offset}` : ""}`,
+      websitePreviewsSchema,
+      "GET",
+      undefined,
+      signal,
+    ),
+  websitePreviewImage: (id: string, key: string) =>
+    `${postPath(id)}/link-preview-image/${encodeURIComponent(key)}`,
+  websitePreviewIcon: (id: string, key: string) =>
+    `${postPath(id)}/link-preview-icon/${encodeURIComponent(key)}`,
   thread: (id: string, signal?: AbortSignal) =>
     request(`${postPath(id)}/thread`, threadSchema, "GET", undefined, signal),
   postEdits: (id: string, signal?: AbortSignal) =>
