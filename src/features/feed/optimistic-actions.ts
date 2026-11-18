@@ -4,6 +4,7 @@ import {
   errorMessage,
   retryRequest,
   type Post,
+  type Poll,
   type Profile,
 } from "@/lib/api";
 import { showRetryToast as retryToast } from "@/lib/retry-toast";
@@ -105,6 +106,27 @@ export function rememberPosts(
     )
       continue;
     posts.set(key, { value: post, revision });
+    changed = true;
+  }
+  if (changed) notify();
+}
+
+export function rememberPollResults(
+  results: { id: string; poll: Poll }[],
+  viewerId: string | null,
+  startedAt: number,
+) {
+  let changed = false;
+  for (const { id, poll } of results) {
+    const key = keyFor(viewerId, id);
+    const entry = posts.get(key);
+    const current = entry?.value.poll;
+    if (!entry || !current || entry.revision > startedAt || deleted.has(key) || isVoting(id, viewerId))
+      continue;
+    if (current.selectedOption === poll.selectedOption &&
+      current.options.every((option, index) => option.votes === poll.options[index]?.votes))
+      continue;
+    posts.set(key, { value: { ...entry.value, poll }, revision: revision + 1 });
     changed = true;
   }
   if (changed) notify();
@@ -218,7 +240,7 @@ export function beginReply(parentId: string, viewerId: string) {
   };
 }
 
-export function isVoting(postId: string, viewerId: string) {
+export function isVoting(postId: string, viewerId: string | null) {
   return postOperations.get(keyFor(viewerId, postId))?.some(
     ({ command }) => command.kind === "vote",
   ) ?? false;

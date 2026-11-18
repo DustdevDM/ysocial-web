@@ -4,16 +4,8 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { LoginDialogContent } from "@/features/auth/login-dialog-content";
 import { MentionTextarea } from "./mention-textarea";
 import {
   Tooltip,
@@ -55,20 +47,10 @@ export function PostComposer({
         >
           {placeholder}
         </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Log in to post</DialogTitle>
-            <DialogDescription>
-              Sign in with CNS to share what's on your mind.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>
-              Cancel
-            </DialogClose>
-            <Button render={<a href="/auth/login" />}>Log in with CNS</Button>
-          </DialogFooter>
-        </DialogContent>
+        <LoginDialogContent
+          title="Log in to post"
+          description="Sign in with CNS to share what's on your mind."
+        />
       </Dialog>
     );
   }

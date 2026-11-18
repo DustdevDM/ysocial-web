@@ -644,6 +644,17 @@ export const api = {
     }),
   vote: (id: string, optionIndex: number) =>
     request(`${postPath(id)}/poll/vote`, z.object({ poll: pollSchema }), "PUT", { optionIndex }),
+  pollResults: (ids: string[], signal: AbortSignal) =>
+    sendRequest(
+      `/api/posts/poll-results?ids=${encodeURIComponent(ids.join(","))}`,
+      z.object({
+        viewerId: z.string().nullable(),
+        results: z.array(z.object({ id: z.string(), poll: pollSchema })),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
   like: (id: string, liked: boolean) =>
     request(
       `${postPath(id)}/like`,
