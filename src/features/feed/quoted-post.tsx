@@ -1,9 +1,11 @@
+import type { MouseEvent, ReactNode } from "react";
 import { formatDistance } from "date-fns";
 import { ChartNoAxesColumn, Quote } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { PostQuote } from "@/lib/api";
+import { PostText } from "./post-text";
 
 /**
  * The post a quote embeds: author, text, GIF and a poll hint. It opens the
@@ -18,6 +20,7 @@ export function QuotedPostCard({
   interactive?: boolean;
   className?: string;
 }) {
+  const navigate = useNavigate();
   if (quote.state === "unavailable") {
     return (
       <div
@@ -31,14 +34,39 @@ export function QuotedPostCard({
     );
   }
   const post = quote.post;
+  // Links can't nest, so the card is a box that opens the post when clicked.
+  // The author line is the keyboard-focusable link; links in the text and
+  // their previews keep working on their own.
   const classes = cn(
-    "mt-2 block min-w-0 rounded-xl border p-3 text-left outline-none transition-colors",
-    interactive && "hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring",
+    "mt-2 block min-w-0 rounded-xl border p-3 text-left transition-colors",
+    interactive &&
+      "cursor-pointer hover:bg-muted/50 has-[a[data-card-link]:focus-visible]:ring-2 has-[a[data-card-link]:focus-visible]:ring-ring",
     className,
   );
+  function open(event: MouseEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    // Portaled dialogs (the external link warning) bubble through React.
+    if (!interactive || !event.currentTarget.contains(target)) return;
+    if (target.closest("a, button")) return;
+    // Keep the surrounding post from opening instead.
+    event.stopPropagation();
+    if (window.getSelection()?.toString() || event.detail > 1) return;
+    const path = `/posts/${post.id}`;
+    if (event.metaKey || event.ctrlKey) {
+      window.open(path, "_blank");
+      return;
+    }
+    // Let a double click select a word before navigating.
+    window.setTimeout(
+      () => {
+        if (!window.getSelection()?.toString()) void navigate(path);
+      },
+      target.closest("[data-selectable]") ? 220 : 0,
+    );
+  }
   const body = (
     <>
-      <div className="flex min-w-0 items-center gap-2 text-sm">
+      <Header interactive={interactive} id={post.id} name={post.author.displayName}>
         <Avatar className="size-5 shrink-0" aria-hidden="true">
           {post.author.avatarUrl && (
             <AvatarImage src={post.author.avatarUrl} alt="" referrerPolicy="no-referrer" />
@@ -56,11 +84,13 @@ export function QuotedPostCard({
         >
           {formatDistance(new Date(post.createdAt), new Date(), { addSuffix: true })}
         </time>
-      </div>
+      </Header>
       {post.content && (
-        <p className="mt-1.5 line-clamp-6 text-sm leading-relaxed break-words whitespace-pre-wrap">
-          {post.content}
-        </p>
+        <PostText
+          post={{ id: post.id, content: post.content }}
+          previewExternalLinks
+          className="mt-1.5 line-clamp-6 text-sm leading-relaxed break-words whitespace-pre-wrap"
+        />
       )}
       {post.gif && (
         <img
@@ -85,11 +115,35 @@ export function QuotedPostCard({
       )}
     </>
   );
-  return interactive ? (
-    <Link to={`/posts/${post.id}`} className={classes} aria-label={`Quoted post by ${post.author.displayName}`}>
+  return (
+    <div className={classes} onClick={open}>
       {body}
+    </div>
+  );
+}
+
+function Header({
+  interactive,
+  id,
+  name,
+  children,
+}: {
+  interactive: boolean;
+  id: string;
+  name: string;
+  children: ReactNode;
+}) {
+  const className = "flex min-w-0 items-center gap-2 text-sm";
+  return interactive ? (
+    <Link
+      to={`/posts/${id}`}
+      data-card-link
+      aria-label={`Quoted post by ${name}`}
+      className={cn(className, "rounded-md outline-none")}
+    >
+      {children}
     </Link>
   ) : (
-    <div className={classes}>{body}</div>
+    <div className={className}>{children}</div>
   );
 }

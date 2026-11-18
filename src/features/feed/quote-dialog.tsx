@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router";
 import {
   Dialog,
   DialogContent,
@@ -6,7 +5,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { toast } from "@/components/ui/toast-manager";
 import type { Post } from "@/lib/api";
 import { PostComposer } from "./post-composer";
 import type { FeedState } from "./use-feed";
@@ -23,7 +21,6 @@ export function QuoteDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const navigate = useNavigate();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
@@ -39,16 +36,6 @@ export function QuoteDialog({
           autoFocus
           placeholder="Add a comment…"
           onSubmitted={() => onOpenChange(false)}
-          onConfirmed={(quote) =>
-            toast.add({
-              title: "Quote posted",
-              timeout: 5000,
-              actionProps: {
-                children: "View",
-                onClick: () => void navigate(`/posts/${quote.id}`),
-              },
-            })
-          }
         />
       </DialogContent>
     </Dialog>

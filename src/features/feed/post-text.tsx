@@ -17,12 +17,16 @@ const chipClassName =
 const chipPlaceholderClassName =
   "inline-flex w-32 max-w-full items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 align-baseline outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
+/** What PostText needs of a post. Quoted posts carry only an id and content. */
+type TextPost = Pick<Post, "id" | "content"> &
+  Partial<Pick<Post, "topics" | "mentions">>;
+
 export function PostText({
   post,
   className,
   previewExternalLinks,
 }: {
-  post: Post;
+  post: TextPost;
   className: string;
   previewExternalLinks: boolean;
 }) {
@@ -233,8 +237,8 @@ function PostChipLabel({
   );
 }
 
-function renderText(post: Post, content: string) {
-  return splitTopics(content, post.topics).map((part, index) =>
+function renderText(post: TextPost, content: string) {
+  return splitTopics(content, post.topics ?? []).map((part, index) =>
     part.topic ? (
       <Link
         key={index}
@@ -245,7 +249,9 @@ function renderText(post: Post, content: string) {
       </Link>
     ) : (
       <Fragment key={index}>
-        <MentionText post={{ ...post, content: part.text }} />
+        <MentionText
+          post={{ content: part.text, mentions: post.mentions ?? [] }}
+        />
       </Fragment>
     ),
   );
