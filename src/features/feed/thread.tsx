@@ -23,6 +23,8 @@ import { PostActivity } from "./post-activity";
 import { useFeed, type FeedState } from "./use-feed";
 import { getActionRevision, rememberPosts } from "./optimistic-actions";
 import { acknowledgePosts } from "./post-outbox";
+import { applyLive } from "./live-insert";
+import { useLiveUpdates } from "./use-live-updates";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useGoBack } from "@/hooks/use-go-back";
 import {
@@ -128,6 +130,42 @@ export function Thread({
     void load(controller.signal);
     return () => controller.abort();
   }, [load, session]);
+  const liveReplyIds = useRef(new Set<string>());
+  useLiveUpdates({
+    enabled: data !== null,
+    scope: cacheKey,
+    relevant: (live) => {
+      if (!data || live.parentId === null) return false;
+      if (
+        data.replies.some((reply) => reply.id === live.id) ||
+        feed.feedPosts.some((reply) => reply.id === live.id)
+      )
+        return false;
+      const inThread =
+        live.parentId === id ||
+        liveReplyIds.current.has(live.parentId) ||
+        data.replies.some((reply) => reply.id === live.parentId);
+      if (inThread) liveReplyIds.current.add(live.id);
+      return inThread;
+    },
+    refresh: async (signal) => {
+      const startedAt = getActionRevision();
+      const result = await api.thread(id, signal);
+      if (signal.aborted) return;
+      const known = new Set(data?.replies.map((reply) => reply.id));
+      if (result.replies.every((reply) => known.has(reply.id))) return;
+      rememberPosts(
+        [result.post, ...result.ancestors, ...result.replies],
+        viewerId,
+        startedAt,
+      );
+      await applyLive(signal, () => {
+        acknowledgePosts(result.replies);
+        threadCache.set(cacheKey, result);
+        setData(result);
+      });
+    },
+  });
   const post = data ? feed.resolvePost(data.post) : null;
   const ancestors = useMemo(
     () =>

@@ -26,6 +26,8 @@ import {
 } from "./optimistic-actions";
 import { toast } from "@/components/ui/toast-manager";
 import { projectRepostContext } from "./repost-context";
+import { applyLive } from "./live-insert";
+import { useLiveUpdates } from "./use-live-updates";
 
 // Feed pages (home, or one topic's) survive navigation, so coming back from a post shows the same
 // list instantly (and can restore the scroll position) while it revalidates.
@@ -79,6 +81,14 @@ export function useFeed(
   const optimisticPostIds = visibleLocalPosts
     .filter((entry) => entry.status === "sending")
     .map((entry) => entry.post.id);
+  const [enteringIds, setEnteringIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  useEffect(() => {
+    if (!enteringIds.size) return;
+    const timer = window.setTimeout(() => setEnteringIds(new Set()), 700);
+    return () => window.clearTimeout(timer);
+  }, [enteringIds]);
   const canPost = !!session?.authenticated && !session.needsOnboarding;
   const load = useCallback(
     async (cursor?: string, signal?: AbortSignal, revalidate = false) => {
@@ -141,6 +151,57 @@ export function useFeed(
     void load(undefined, controller.signal, !!cached);
     return () => controller.abort();
   }, [load, session, autoLoad, cached]);
+  useLiveUpdates({
+    enabled: autoLoad && parentId === undefined,
+    scope: `${viewerId ?? "anonymous"}|${topic ?? ""}`,
+    relevant: (live) =>
+      (topic ? live.topics.includes(topic) : live.parentId === null) &&
+      !localIds.has(live.id) &&
+      !feedPosts.some((post) => post.id === live.id),
+    refresh: async (signal) => {
+      const startedAt = getActionRevision();
+      const page = await api.posts(undefined, signal, topic);
+      if (signal.aborted) return;
+      const known = new Set([...localIds, ...feedPosts.map((post) => post.id)]);
+      const fresh = page.posts.filter((post) => !known.has(post.id));
+      if (!fresh.length) return;
+      const contiguous =
+        known.size === 0 ||
+        !page.nextCursor ||
+        page.posts.some((post) => known.has(post.id));
+      rememberPosts(page.posts, viewerId, startedAt);
+      await applyLive(
+        signal,
+        (atTop) => {
+          if (contiguous) {
+            const freshIds = new Set(fresh.map((post) => post.id));
+            setFeedPosts((current) => [
+              ...fresh.filter(
+                (post) => !current.some((existing) => existing.id === post.id),
+              ),
+              ...current,
+            ]);
+            setRepostedBy((current) => ({
+              ...current,
+              ...Object.fromEntries(
+                Object.entries(page.repostedBy).filter(([id]) =>
+                  freshIds.has(id),
+                ),
+              ),
+            }));
+            if (atTop)
+              setEnteringIds((current) => new Set([...current, ...freshIds]));
+          } else if (atTop) {
+            setFeedPosts(page.posts);
+            setRepostedBy(page.repostedBy);
+            setNextCursor(page.nextCursor);
+          }
+          acknowledgePosts(page.posts);
+        },
+        { followTop: true },
+      );
+    },
+  });
   function publishPost(
     text: string = draft,
     gif: GifSearchItem | null = null,
@@ -251,6 +312,7 @@ export function useFeed(
     publishQuote,
     viewerReposts: viewerId ? cachedReposts(viewerId) : [],
     optimisticPostIds,
+    enteringIds,
     draft,
     setDraft,
     publishPost,
