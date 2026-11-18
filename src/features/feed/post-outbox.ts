@@ -10,6 +10,7 @@ import {
 import { beginReply, rememberPosts } from "./optimistic-actions";
 import { toast } from "@/components/ui/toast-manager";
 import { extractTopics } from "@/lib/topics";
+import { quoteOf } from "./quote";
 
 type LocalPost = { status: "sending" | "confirmed"; post: Post };
 let snapshot: LocalPost[] = [];
@@ -49,6 +50,7 @@ export function publishOptimistically({
   poll,
   author,
   parentId,
+  quoting,
   onConfirmed,
 }: {
   content: string;
@@ -56,7 +58,9 @@ export function publishOptimistically({
   poll?: PollDraft;
   author: Post["author"];
   parentId: string | null;
-  onConfirmed?: () => void;
+  /** The post being quoted. A quote is always a top-level post. */
+  quoting?: Post;
+  onConfirmed?: (post: Post) => void;
 }) {
   const now = new Date();
   const optimistic: Post = {
@@ -82,11 +86,16 @@ export function publishOptimistically({
     liked: false,
     reposts: 0,
     reposted: false,
+    repostAudience: null,
+    quotes: 0,
+    quote: quoting ? quoteOf(quoting) : null,
+    replyTo: null,
     replies: 0,
     // Replies are never tagged; the API confirms the same topics for posts.
     topics: extractTopics(content),
   };
   let failedToastId: string | undefined;
+  let confirmed = optimistic;
   async function send(retry = false): Promise<boolean> {
     if (inFlight.has(optimistic.id)) return false;
     inFlight.add(optimistic.id);
@@ -111,12 +120,13 @@ export function publishOptimistically({
         () =>
           parentId
             ? api.reply(parentId, content, optimistic.id, gif?.token, poll)
-            : api.publish(content, optimistic.id, gif?.token, poll),
+            : api.publish(content, optimistic.id, gif?.token, poll, quoting?.id),
         {
           context: parentId ? "publish reply" : "publish post",
           beforeRetry: verifyAccount,
         },
       );
+      confirmed = post;
       rememberPosts([post], author.id);
       finishReply?.(true);
       update(
@@ -149,7 +159,7 @@ export function publishOptimistically({
     if (!parentId || optimistic.topics.length) {
       for (const listener of publishedListeners) listener();
     }
-    onConfirmed?.();
+    onConfirmed?.(confirmed);
     return true;
   }
   return send();

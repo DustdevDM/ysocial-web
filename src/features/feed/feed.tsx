@@ -74,7 +74,13 @@ export function Feed({
           </div>
         )}
         {feed.feedPosts.map((post) => (
-          <PostCard key={post.id} post={post} feed={feed} />
+          <PostCard
+            key={post.id}
+            post={post}
+            feed={feed}
+            repost={feed.repostContext(post)}
+            replyContext
+          />
         ))}
         {feed.loading && (
           <PostListSkeleton

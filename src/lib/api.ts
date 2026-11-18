@@ -14,7 +14,39 @@ const userSchema = z.object({
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
 });
-const activityUserSchema = userSchema.extend({ optionLabel: z.string().optional() });
+const activityUserSchema = userSchema.extend({
+  optionLabel: z.string().optional(),
+  // Quote activity: the quote post this person wrote.
+  quoteId: z.string().optional(),
+});
+export const repostAudienceSchema = z.enum(["public", "friends"]);
+export type RepostAudience = z.infer<typeof repostAudienceSchema>;
+/** The post embedded in a quote, one level deep. */
+const quotedPostSchema = z.object({
+  id: z.string(),
+  content: z.string(),
+  gif: z.object({ url: z.string(), title: z.string() }).nullable().default(null),
+  createdAt: z.string(),
+  editedAt: z.string().nullable(),
+  parentId: z.string().nullable(),
+  pollTitle: z.string().nullable(),
+  isQuote: z.boolean(),
+  author: userSchema,
+});
+const quoteSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("available"), post: quotedPostSchema }),
+  z.object({ state: z.literal("unavailable") }),
+]);
+export type QuotedPost = z.infer<typeof quotedPostSchema>;
+export type PostQuote = z.infer<typeof quoteSchema>;
+/** Why a post sits in a list as a repost: who shared it and how widely. */
+const repostContextSchema = z.object({
+  by: userSchema,
+  audience: repostAudienceSchema,
+  others: z.number().int().nonnegative(),
+});
+export type RepostContext = z.infer<typeof repostContextSchema>;
+const repostedBySchema = z.record(z.string(), repostContextSchema).default({});
 const postGifSchema = z.object({ url: z.string(), title: z.string() });
 export const pollDraftSchema = z.object({
   title: z.string().trim().min(1).max(120),
@@ -49,6 +81,16 @@ const postSchema = z.object({
   replies: z.number(),
   reposts: z.number(),
   reposted: z.boolean(),
+  // How the viewer reposted it, if they did.
+  repostAudience: repostAudienceSchema.nullable().default(null),
+  quotes: z.number().default(0),
+  // The embedded post when this post is a quote.
+  quote: quoteSchema.nullable().default(null),
+  // Who this post answers, for replies shown outside their thread.
+  replyTo: z
+    .object({ id: z.string(), handle: z.string(), displayName: z.string() })
+    .nullable()
+    .default(null),
   // Mutual follows who liked this post: how many, and the first few.
   friendLikes: z.number().default(0),
   friendLikers: z.array(userSchema).default([]),
@@ -58,6 +100,7 @@ const postSchema = z.object({
 const topicCountSchema = z.object({ name: z.string(), count: z.number() });
 const pageSchema = z.object({
   posts: z.array(postSchema),
+  repostedBy: repostedBySchema,
   nextCursor: z.string().nullable(),
   serverNow: z.string(),
 });
@@ -104,7 +147,9 @@ const profileSchema = z.object({
   isFollowing: z.boolean(),
   isFollowedBy: z.boolean(),
   posts: z.array(postSchema),
+  // Plain reposts and the person's own quote posts, newest first.
   reposts: z.array(postSchema),
+  repostedBy: repostedBySchema,
   replies: z.array(z.object({ post: postSchema, thread: z.array(postSchema) })),
   serverNow: z.string(),
 });
@@ -117,7 +162,7 @@ export type Session = z.infer<typeof sessionSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 const notificationSchema = z.object({
   id: z.string(),
-  kind: z.enum(["like", "repost", "reply", "follow", "mention"]),
+  kind: z.enum(["like", "repost", "reply", "follow", "mention", "quote"]),
   actor: userSchema,
   postId: z.string().nullable(),
   preview: z.string().nullable(),
@@ -153,6 +198,7 @@ const traceCodes: Record<string, number> = {
   poll_not_found: 2008,
   invalid_poll_option: 2009,
   poll_is_anonymous: 2011,
+  invalid_repost: 2012,
   // profile
   profile_not_found: 3001,
   invalid_profile: 3002,
@@ -591,7 +637,7 @@ export const api = {
     ),
   postActivity: (
     id: string,
-    type: "likes" | "reposts" | "voters",
+    type: "likes" | "reposts" | "quotes" | "voters",
     { cursor, signal, options }: { cursor?: string; signal?: AbortSignal; options?: readonly number[] },
   ) => {
     const params = new URLSearchParams();
@@ -620,12 +666,19 @@ export const api = {
       undefined,
       signal,
     ),
-  publish: (content: string, clientId?: string, gifToken?: string, poll?: PollDraft) =>
+  publish: (
+    content: string,
+    clientId?: string,
+    gifToken?: string,
+    poll?: PollDraft,
+    quotedPostId?: string,
+  ) =>
     request("/api/posts", postResponseSchema, "POST", {
       content,
       clientId,
       gifToken,
       poll,
+      quotedPostId,
     }),
   replies: (id: string, cursor?: string, signal?: AbortSignal) =>
     request(
@@ -661,11 +714,16 @@ export const api = {
       z.object({ likes: z.number(), liked: z.boolean() }),
       liked ? "PUT" : "DELETE",
     ),
-  repost: (id: string, reposted: boolean) =>
+  repost: (id: string, reposted: boolean, audience: RepostAudience = "public") =>
     request(
       `${postPath(id)}/repost`,
-      z.object({ reposts: z.number(), reposted: z.boolean() }),
+      z.object({
+        reposts: z.number(),
+        reposted: z.boolean(),
+        repostAudience: repostAudienceSchema.nullable(),
+      }),
       reposted ? "PUT" : "DELETE",
+      reposted ? { audience } : undefined,
     ),
   edit: (id: string, content: string) =>
     request(postPath(id), postResponseSchema, "PATCH", { content }),

@@ -4,6 +4,7 @@ import {
   ApiError,
   errorMessage,
   retryRequest,
+  type Post,
   type Profile,
   type Session,
   type BannerCrop,
@@ -105,7 +106,14 @@ export function ProfilePage({
           ]
             .map(feed.resolvePost)
             .filter((post) => post !== null)
-            .filter((post) => !ownProfile || post.reposted),
+            // On your own profile an undone repost disappears at once; your
+            // own quotes stay, since they are posts rather than a toggle.
+            .filter(
+              (post) =>
+                !ownProfile ||
+                post.reposted ||
+                (post.quote !== null && post.author.id === loadedProfile.profile.id),
+            ),
           replies: loadedProfile.replies.flatMap((reply) => {
             const post = feed.resolvePost(reply.post);
             return post
@@ -121,6 +129,20 @@ export function ProfilePage({
           }),
         }
       : null;
+  /** "X reposted" for a post on the Reposts tab; the person's own quotes have none. */
+  function repostContextFor(post: Post) {
+    if (!profile) return null;
+    const base =
+      profile.repostedBy[post.id] ??
+      (ownProfile && post.reposted
+        ? {
+            by: profile.profile,
+            audience: post.repostAudience ?? ("public" as const),
+            others: 0,
+          }
+        : undefined);
+    return feed.repostContext(post, base, false);
+  }
   const avatarUrl = profile?.profile.avatarUrl;
   const friends = profile?.isFollowing && profile.isFollowedBy;
   function toggleFollow() {
@@ -485,7 +507,13 @@ export function ProfilePage({
                 </section>
               ))
             : profile[tab].map((post) => (
-                <PostCard key={post.id} post={post} feed={feed} />
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  feed={feed}
+                  repost={tab === "reposts" ? repostContextFor(post) : null}
+                  replyContext={tab === "reposts"}
+                />
               ))}
           {profile[tab].length === 0 && <p className="mt-4">No {tab} yet.</p>}
         </>

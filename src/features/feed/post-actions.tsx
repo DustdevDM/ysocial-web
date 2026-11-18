@@ -1,6 +1,16 @@
+import { useState } from "react";
 import NumberFlow from "@number-flow/react";
-import { Heart, MessageCircle, Repeat2, Share2 } from "lucide-react";
+import {
+  Heart,
+  MessageCircle,
+  Quote,
+  Repeat2,
+  Share2,
+  Undo2,
+  Users,
+} from "lucide-react";
 import { Link } from "react-router";
+import { ActionMenu } from "@/components/ui/action-menu";
 import { IconButton } from "@/components/ui/icon-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
@@ -8,15 +18,17 @@ import { countFormat } from "@/lib/count-format";
 import type { Post } from "@/lib/api";
 import { toast } from "@/components/ui/toast-manager";
 import type { FeedState } from "./use-feed";
+import { QuoteDialog } from "./quote-dialog";
 
 const actionClass = (extra?: string | false) =>
   cn("gap-1.5 px-2 text-muted-foreground", extra);
 
 export function PostActions({ post, feed }: { post: Post; feed: FeedState }) {
+  const [quoting, setQuoting] = useState(false);
   const optimistic = feed.optimisticPostIds.includes(post.id);
   const disabled = feed.pending.includes(post.id);
   // Signed-out people get an explanation instead of dead, greyed-out buttons.
-  function react(action: "like" | "repost", run: () => unknown) {
+  function react(action: "like" | "repost" | "quote", run: () => unknown) {
     if (feed.canPost) return void run();
     toast.add({
       title: feed.authenticated
@@ -67,23 +79,76 @@ export function PostActions({ post, feed }: { post: Post; feed: FeedState }) {
         <MessageCircle className="size-3.5" />
         <NumberFlow format={countFormat} value={post.replies} />
       </Link>
-      <IconButton
-        variant="ghost"
-        size="sm"
-        className={actionClass(
-          post.reposted && "text-green-500 hover:text-green-500",
-        )}
-        label={post.reposted ? "Undo repost" : "Repost"}
-        aria-pressed={post.reposted}
-        disabled={disabled}
-        onClick={() => react("repost", () => feed.toggleRepost(post))}
-      >
-        <Repeat2
-          key={String(post.reposted)}
-          className={post.reposted ? "animate-[turn_500ms_ease-in-out]" : undefined}
-        />
-        <NumberFlow format={countFormat} value={post.reposts} />
-      </IconButton>
+      {(() => {
+        const repostButton = (
+          <IconButton
+            variant="ghost"
+            size="sm"
+            className={actionClass(
+              post.reposted && "text-green-500 hover:text-green-500",
+            )}
+            label={
+              post.reposted
+                ? post.repostAudience === "friends"
+                  ? "Reposted to friends"
+                  : "Reposted"
+                : "Repost or quote"
+            }
+            aria-haspopup="menu"
+            disabled={disabled}
+            // Signed-out people get the explanation toast instead of the menu.
+            onClick={
+              feed.canPost
+                ? undefined
+                : (event) => {
+                    event.preventDefault();
+                    react("repost", () => undefined);
+                  }
+            }
+          >
+            <Repeat2
+              key={String(post.reposted)}
+              className={post.reposted ? "animate-[turn_500ms_ease-in-out]" : undefined}
+            />
+            {post.repostAudience === "friends" && (
+              <Users className="-ml-1 size-3" aria-hidden="true" />
+            )}
+            <NumberFlow format={countFormat} value={post.reposts + post.quotes} />
+          </IconButton>
+        );
+        const isPublic = post.reposted && post.repostAudience !== "friends";
+        const isFriends = post.reposted && post.repostAudience === "friends";
+        return feed.canPost ? (
+          <ActionMenu
+            title="Repost options"
+            hideTitle
+            large
+            trigger={repostButton}
+            items={[
+              {
+                kind: "action",
+                icon: isPublic ? Undo2 : Repeat2,
+                label: isPublic ? "Undo repost" : "Repost",
+                onClick: () => feed.setRepost(post, isPublic ? null : "public"),
+              },
+              {
+                kind: "action",
+                icon: isFriends ? Undo2 : Users,
+                label: isFriends ? "Undo repost to friends" : "Repost to friends",
+                onClick: () => feed.setRepost(post, isFriends ? null : "friends"),
+              },
+              {
+                kind: "action",
+                icon: Quote,
+                label: "Quote",
+                onClick: () => setQuoting(true),
+              },
+            ]}
+          />
+        ) : (
+          repostButton
+        );
+      })()}
       <IconButton
         variant="ghost"
         size="sm"
@@ -94,6 +159,9 @@ export function PostActions({ post, feed }: { post: Post; feed: FeedState }) {
       >
         <Share2 />
       </IconButton>
+      {quoting && (
+        <QuoteDialog post={post} feed={feed} open={quoting} onOpenChange={setQuoting} />
+      )}
     </div>
   );
 }
