@@ -14,7 +14,42 @@ const userSchema = z.object({
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
 });
-const activityUserSchema = userSchema.extend({ optionLabel: z.string().optional() });
+const activityUserSchema = userSchema.extend({
+  optionLabel: z.string().optional(),
+  // Quote activity: the quote post this person wrote.
+  quoteId: z.string().optional(),
+});
+export const repostAudienceSchema = z.enum(["public", "friends"]);
+export type RepostAudience = z.infer<typeof repostAudienceSchema>;
+/** The post embedded in a quote, one level deep. */
+const quotedPostSchema = z.object({
+  id: z.string(),
+  content: z.string(),
+  gif: z
+    .object({ url: z.string(), title: z.string() })
+    .nullable()
+    .default(null),
+  createdAt: z.string(),
+  editedAt: z.string().nullable(),
+  parentId: z.string().nullable(),
+  pollTitle: z.string().nullable(),
+  isQuote: z.boolean(),
+  author: userSchema,
+});
+const quoteSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("available"), post: quotedPostSchema }),
+  z.object({ state: z.literal("unavailable") }),
+]);
+export type QuotedPost = z.infer<typeof quotedPostSchema>;
+export type PostQuote = z.infer<typeof quoteSchema>;
+/** Why a post sits in a list as a repost: who shared it and how widely. */
+const repostContextSchema = z.object({
+  by: userSchema,
+  audience: repostAudienceSchema,
+  others: z.number().int().nonnegative(),
+});
+export type RepostContext = z.infer<typeof repostContextSchema>;
+const repostedBySchema = z.record(z.string(), repostContextSchema).default({});
 const postGifSchema = z.object({ url: z.string(), title: z.string() });
 const voiceSchema = z.object({
   url: z.string(), durationMs: z.number().int().min(2000).max(120000), bytes: z.number().int().positive(),
@@ -25,18 +60,26 @@ const voiceJobSchema = z.union([voiceDraftSchema, z.object({ pending: z.literal(
 export type VoiceDraft = z.infer<typeof voiceDraftSchema>;
 export const pollDraftSchema = z.object({
   title: z.string().trim().min(1).max(120),
-  options: z.array(z.string().trim().min(1).max(80)).min(2).max(6).refine(
-    (options) => new Set(options.map((option) => option.toLowerCase())).size === options.length,
-  ),
+  options: z
+    .array(z.string().trim().min(1).max(80))
+    .min(2)
+    .max(6)
+    .refine(
+      (options) =>
+        new Set(options.map((option) => option.toLowerCase())).size ===
+        options.length,
+    ),
   anonymous: z.boolean(),
 });
 const pollSchema = pollDraftSchema.extend({
-  options: z.array(z.object({ label: z.string(), votes: z.number().int().nonnegative() })),
+  options: z.array(
+    z.object({ label: z.string(), votes: z.number().int().nonnegative() }),
+  ),
   selectedOption: z.number().int().nonnegative().nullable(),
 });
 export type PollDraft = z.infer<typeof pollDraftSchema>;
 export type Poll = z.infer<typeof pollSchema>;
-const postSchema = z.object({
+const basePostSchema = z.object({
   mentions: z
     .array(
       z.object({ id: z.string(), handle: z.string(), username: z.string() }),
@@ -57,15 +100,30 @@ const postSchema = z.object({
   replies: z.number(),
   reposts: z.number(),
   reposted: z.boolean(),
+  // How the viewer reposted it, if they did.
+  repostAudience: repostAudienceSchema.nullable().default(null),
+  quotes: z.number().default(0),
+  // The embedded post when this post is a quote.
+  quote: quoteSchema.nullable().default(null),
+  // Who this post answers, for replies shown outside their thread.
+  replyTo: z
+    .object({ id: z.string(), handle: z.string(), displayName: z.string() })
+    .nullable()
+    .default(null),
   // Mutual follows who liked this post: how many, and the first few.
   friendLikes: z.number().default(0),
   friendLikers: z.array(userSchema).default([]),
   // Normalized topics (#name) in the post or reply.
   topics: z.array(z.string()).default([]),
 });
+const postSchema = basePostSchema.extend({
+  // Topic pages only: the posts above a reply, root first.
+  ancestors: z.array(basePostSchema).optional(),
+});
 const topicCountSchema = z.object({ name: z.string(), count: z.number() });
 const pageSchema = z.object({
   posts: z.array(postSchema),
+  repostedBy: repostedBySchema,
   nextCursor: z.string().nullable(),
   serverNow: z.string(),
 });
@@ -76,7 +134,10 @@ const postResponseSchema = z.object({
 const websiteLinkSchema = z.object({
   href: z.string(),
   title: z.string(),
-  iconKey: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  iconKey: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
 });
 const imagePreviewKeySchema = z.string().regex(/^[0-9a-f]{64}$/);
 const pagePreviewSchema = websiteLinkSchema.extend({
@@ -87,7 +148,10 @@ const pagePreviewSchema = websiteLinkSchema.extend({
 });
 const websitePreviewSchema = z.union([
   pagePreviewSchema,
-  websiteLinkSchema.extend({ kind: z.literal("image"), imageKey: imagePreviewKeySchema }),
+  websiteLinkSchema.extend({
+    kind: z.literal("image"),
+    imageKey: imagePreviewKeySchema,
+  }),
 ]);
 const websitePreviewsSchema = z.object({
   links: z.array(websiteLinkSchema).default([]),
@@ -135,7 +199,9 @@ const profileSchema = z.object({
   isFollowing: z.boolean(),
   isFollowedBy: z.boolean(),
   posts: z.array(postSchema),
+  // Plain reposts and the person's own quote posts, newest first.
   reposts: z.array(postSchema),
+  repostedBy: repostedBySchema,
   replies: z.array(z.object({ post: postSchema, thread: z.array(postSchema) })),
   serverNow: z.string(),
 });
@@ -148,7 +214,7 @@ export type Session = z.infer<typeof sessionSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 const notificationSchema = z.object({
   id: z.string(),
-  kind: z.enum(["like", "repost", "reply", "follow", "mention"]),
+  kind: z.enum(["like", "repost", "reply", "follow", "mention", "quote"]),
   actor: userSchema,
   postId: z.string().nullable(),
   preview: z.string().nullable(),
@@ -184,6 +250,7 @@ const traceCodes: Record<string, number> = {
   poll_not_found: 2008,
   invalid_poll_option: 2009,
   poll_is_anonymous: 2011,
+  invalid_repost: 2012,
   // profile
   profile_not_found: 3001,
   invalid_profile: 3002,
@@ -208,15 +275,16 @@ const traceCodes: Record<string, number> = {
   invalid_banner: 5006,
   invalid_banner_crop: 5007,
   banner_not_found: 5008,
-  invalid_voice: 5009,
-  voice_too_short: 5010,
-  voice_too_long: 5011,
-  invalid_voice_selection: 5012,
-  voice_audio_required: 5013,
-  voice_not_found: 5014,
-  voice_processing_unavailable: 5015,
-  voice_processing_busy: 5016,
-  voice_not_configured: 5017,
+  avatar_in_use: 5009,
+  invalid_voice: 5010,
+  voice_too_short: 5011,
+  voice_too_long: 5012,
+  invalid_voice_selection: 5013,
+  voice_audio_required: 5014,
+  voice_not_found: 5015,
+  voice_processing_unavailable: 5016,
+  voice_processing_busy: 5017,
+  voice_not_configured: 5018,
   // gif
   invalid_gif_selection: 6001,
   invalid_search: 6002,
@@ -362,6 +430,8 @@ function friendlyMessage(error: unknown) {
       return "Choose a JPEG, PNG, AVIF, WebP or GIF under 10 MB. Animated images must have no more than 120 frames.";
     if (error.message === "avatar_storage_not_configured")
       return "Profile picture uploads are not configured yet.";
+    if (error.message === "avatar_not_found")
+      return "This picture is no longer available.";
     if (error.message === "avatar_storage_unavailable")
       return "Picture storage is temporarily unavailable. Please try again.";
     if (
@@ -387,7 +457,8 @@ function friendlyMessage(error: unknown) {
     if (error.status === 0)
       return "You seem to be offline. Check your connection and try again.";
     if (error.status === 403) return "You don't have permission to do that.";
-    if (error.status === 404) return "We couldn't find what you were looking for.";
+    if (error.status === 404)
+      return "We couldn't find what you were looking for.";
     if (error.status === 429)
       return "Too many requests. Wait a moment, then try again.";
     if (error.status >= 500)
@@ -615,6 +686,32 @@ export const api = {
       picture,
       signal,
     ),
+  recentAvatars: (signal?: AbortSignal) =>
+    request(
+      "/api/avatars/recent",
+      z.object({
+        avatars: z.array(z.object({ id: z.string(), avatarUrl: z.string() })),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
+  selectRecentAvatar: (id: string, signal?: AbortSignal) =>
+    request(
+      `/api/avatars/recent/${encodeURIComponent(id)}`,
+      z.object({ avatarUrl: z.string() }),
+      "POST",
+      undefined,
+      signal,
+    ),
+  removeRecentAvatar: (id: string, signal?: AbortSignal) =>
+    request(
+      `/api/avatars/recent/${encodeURIComponent(id)}`,
+      z.undefined(),
+      "DELETE",
+      undefined,
+      signal,
+    ),
   logout: () => request("/auth/logout", z.undefined(), "POST"),
   posts: (cursor?: string, signal?: AbortSignal, topic?: string) => {
     const query = new URLSearchParams();
@@ -687,13 +784,18 @@ export const api = {
     ),
   postActivity: (
     id: string,
-    type: "likes" | "reposts" | "voters",
-    { cursor, signal, options }: { cursor?: string; signal?: AbortSignal; options?: readonly number[] },
+    type: "likes" | "reposts" | "quotes" | "voters",
+    {
+      cursor,
+      signal,
+      options,
+    }: { cursor?: string; signal?: AbortSignal; options?: readonly number[] },
   ) => {
     const params = new URLSearchParams();
     if (type !== "voters") params.set("type", type);
     if (type === "voters") {
-      for (const option of options ?? []) params.append("option", String(option));
+      for (const option of options ?? [])
+        params.append("option", String(option));
     }
     if (cursor) params.set("cursor", cursor);
     const path = type === "voters" ? "poll/voters" : "activity";
@@ -735,13 +837,21 @@ export const api = {
     request(`/api/voices/jobs/${id}`, z.undefined(), "DELETE", undefined, attemptSignal(10_000, signal)),
   discardVoice: (token: string, signal?: AbortSignal) =>
     request("/api/voices", z.undefined(), "DELETE", { token }, attemptSignal(10_000, signal)),
-  publish: (content: string, clientId?: string, gifToken?: string, poll?: PollDraft, voiceToken?: string) =>
+  publish: (
+    content: string,
+    clientId?: string,
+    gifToken?: string,
+    poll?: PollDraft,
+    quotedPostId?: string,
+    voiceToken?: string,
+  ) =>
     request("/api/posts", postResponseSchema, "POST", {
       content,
       clientId,
       gifToken,
       voiceToken,
       poll,
+      quotedPostId,
     }, voiceToken ? AbortSignal.timeout(15_000) : undefined),
   replies: (id: string, cursor?: string, signal?: AbortSignal) =>
     request(
@@ -751,7 +861,14 @@ export const api = {
       undefined,
       signal,
     ),
-  reply: (id: string, content: string, clientId?: string, gifToken?: string, poll?: PollDraft, voiceToken?: string) =>
+  reply: (
+    id: string,
+    content: string,
+    clientId?: string,
+    gifToken?: string,
+    poll?: PollDraft,
+    voiceToken?: string,
+  ) =>
     request(`${postPath(id)}/replies`, postResponseSchema, "POST", {
       content,
       clientId,
@@ -760,7 +877,23 @@ export const api = {
       poll,
     }, voiceToken ? AbortSignal.timeout(15_000) : undefined),
   vote: (id: string, optionIndex: number) =>
-    request(`${postPath(id)}/poll/vote`, z.object({ poll: pollSchema }), "PUT", { optionIndex }),
+    request(
+      `${postPath(id)}/poll/vote`,
+      z.object({ poll: pollSchema }),
+      "PUT",
+      { optionIndex },
+    ),
+  postStates: (ids: string[], signal: AbortSignal) =>
+    sendRequest(
+      `/api/posts/states?ids=${encodeURIComponent(ids.join(","))}`,
+      z.object({
+        viewerId: z.string().nullable(),
+        posts: z.array(postSchema),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
   pollResults: (ids: string[], signal: AbortSignal) =>
     sendRequest(
       `/api/posts/poll-results?ids=${encodeURIComponent(ids.join(","))}`,
@@ -778,11 +911,20 @@ export const api = {
       z.object({ likes: z.number(), liked: z.boolean() }),
       liked ? "PUT" : "DELETE",
     ),
-  repost: (id: string, reposted: boolean) =>
+  repost: (
+    id: string,
+    reposted: boolean,
+    audience: RepostAudience = "public",
+  ) =>
     request(
       `${postPath(id)}/repost`,
-      z.object({ reposts: z.number(), reposted: z.boolean() }),
+      z.object({
+        reposts: z.number(),
+        reposted: z.boolean(),
+        repostAudience: repostAudienceSchema.nullable(),
+      }),
       reposted ? "PUT" : "DELETE",
+      reposted ? { audience } : undefined,
     ),
   edit: (id: string, content: string) =>
     request(postPath(id), postResponseSchema, "PATCH", { content }),

@@ -14,7 +14,15 @@ import {
 } from "@/components/ui/tooltip";
 import type { FeedState } from "./use-feed";
 import { GifPicker } from "@/features/gifs/gif-picker";
-import { pollDraftSchema, type GifSearchItem, type PollDraft, type VoiceDraft } from "@/lib/api";
+import {
+  pollDraftSchema,
+  type GifSearchItem,
+  type PollDraft,
+  type Post,
+  type VoiceDraft,
+} from "@/lib/api";
+import { QuotedPostCard } from "./quoted-post";
+import { quoteOf } from "./quote";
 import { VoiceRecorder } from "./voice-recorder";
 import { splitWrittenTopics } from "@/lib/topics";
 import { renderShortcodes } from "@/lib/emoji";
@@ -25,16 +33,27 @@ import {
   useTopicSuggestions,
 } from "./topic-suggestions";
 
+export type QuoteOptions = {
+  /** Compose a quote of this post instead of an ordinary post. */
+  quote?: Post;
+  autoFocus?: boolean;
+  /** Called right after the quote is handed off for sending. */
+  onSubmitted?: () => void;
+  /** Called once the server has saved the quote. */
+  onConfirmed?: (post: Post) => void;
+};
+
 export function PostComposer({
   feed,
   placeholder = "What's on your mind?",
   topics = true,
+  ...quoting
 }: {
   feed: FeedState;
   placeholder?: string;
   /** Offer #topic completion. */
   topics?: boolean;
-}) {
+} & QuoteOptions) {
   if (!feed.sessionLoading && !feed.authenticated) {
     return (
       <Dialog>
@@ -60,6 +79,7 @@ export function PostComposer({
       feed={feed}
       placeholder={placeholder}
       topics={topics}
+      {...quoting}
     />
   );
 }
@@ -126,11 +146,15 @@ function AuthenticatedPostComposer({
   feed,
   placeholder,
   topics,
+  quote,
+  autoFocus,
+  onSubmitted,
+  onConfirmed,
 }: {
   feed: FeedState;
   placeholder: string;
   topics: boolean;
-}) {
+} & QuoteOptions) {
   const [published, setPublished] = useState(false);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
   const [gif, setGif] = useState<GifSearchItem | null>(null);
@@ -189,6 +213,10 @@ function AuthenticatedPostComposer({
   }, [draft]);
 
   useEffect(() => {
+    if (autoFocus) textarea.current?.focus();
+  }, [autoFocus]);
+
+  useEffect(() => {
     if (!published) return;
     const timer = setTimeout(() => setPublished(false), 2000);
     return () => clearTimeout(timer);
@@ -205,7 +233,11 @@ function AuthenticatedPostComposer({
 
   function publish() {
     if (!valid) return;
-    if (!feed.publishPost(finalDraft, gif, parsedPoll?.data, voice)) return;
+    const started = quote
+      ? feed.publishQuote(quote, finalDraft, gif, parsedPoll?.data, onConfirmed, voice)
+      : feed.publishPost(finalDraft, gif, parsedPoll?.data, voice);
+    if (!started) return;
+    onSubmitted?.();
     setVoice(undefined);
     setVoiceKey((key) => key + 1);
     setGif(null);
@@ -411,7 +443,7 @@ function AuthenticatedPostComposer({
                   <span className="text-[10px] font-semibold">GIF</span>
                 </DialogTrigger>
                 <IconButton
-                  label="Publish post"
+                  label={quote ? "Publish quote" : "Publish post"}
                   type="submit"
                   variant="default"
                   className="rounded-full"
@@ -433,6 +465,9 @@ function AuthenticatedPostComposer({
             {published ? "Post added" : ""}
           </p>
         </form>
+        {quote && (
+          <QuotedPostCard quote={quoteOf(quote)} interactive={false} className="mx-1" />
+        )}
         <TopicSuggestionList
           id={suggestionsId}
           suggestions={suggestions}

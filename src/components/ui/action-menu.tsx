@@ -35,10 +35,16 @@ export function ActionMenu({
   trigger,
   title,
   items,
+  hideTitle = false,
+  large = false,
 }: {
   trigger: ReactElement;
   title?: ReactNode;
   items: ActionMenuItem[];
+  /** Keep the title for screen readers only, without a visible heading. */
+  hideTitle?: boolean;
+  /** Bigger, easier to hit rows in the mobile drawer. Desktop menus stay compact. */
+  large?: boolean;
 }) {
   const mobile = useIsMobile();
   if (mobile) {
@@ -46,9 +52,13 @@ export function ActionMenu({
       <Drawer showSwipeHandle>
         <DrawerTrigger render={trigger} />
         <DrawerContent aria-describedby={undefined}>
-          <DrawerHeader>
-            <DrawerTitle>{title ?? "Menu"}</DrawerTitle>
-          </DrawerHeader>
+          {hideTitle ? (
+            <DrawerTitle className="sr-only">{title ?? "Menu"}</DrawerTitle>
+          ) : (
+            <DrawerHeader>
+              <DrawerTitle>{title ?? "Menu"}</DrawerTitle>
+            </DrawerHeader>
+          )}
           <div className="overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {items.map(({ icon: Icon, ...item }) => (
               <DrawerClose
@@ -60,7 +70,7 @@ export function ActionMenu({
                 render={
                   <Button
                     variant="ghost"
-                    className={`min-h-12 w-full justify-start gap-3 text-base ${item.destructive ? "mt-2 border-t text-destructive hover:text-destructive" : ""}`}
+                    className={`${large ? "min-h-14 gap-4 text-lg [&_svg:not([class*='size-'])]:size-6" : "min-h-12 gap-3 text-base"} w-full justify-start ${item.destructive ? "mt-2 border-t text-destructive hover:text-destructive" : ""}`}
                     nativeButton={item.kind !== "link"}
                     render={
                       item.kind === "link" ? (
@@ -85,9 +95,13 @@ export function ActionMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={trigger} />
-      <DropdownMenuContent align="end" sideOffset={8} className="w-52">
-        <DropdownMenuGroup>
-          {title && <DropdownMenuLabel>{title}</DropdownMenuLabel>}
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-52"
+      >
+        <DropdownMenuGroup aria-label={typeof title === "string" ? title : undefined}>
+          {title && !hideTitle && <DropdownMenuLabel>{title}</DropdownMenuLabel>}
           {items.map(({ icon: Icon, ...item }) => (
             <div key={item.label}>
               {item.destructive && <DropdownMenuSeparator />}

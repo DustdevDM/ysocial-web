@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { RotateCcw } from "lucide-react";
+import { Link } from "react-router";
+import { Ellipsis, RotateCcw } from "lucide-react";
 import {
   ComposerSkeleton,
   PostListSkeleton,
@@ -8,6 +9,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { PostComposer } from "./post-composer";
 import { PostCard } from "./post-card";
+import type { Post } from "@/lib/api";
 import type { FeedState } from "./use-feed";
 import { PullToRefresh } from "./pull-to-refresh.tsx";
 
@@ -74,7 +76,12 @@ export function Feed({
           </div>
         )}
         {feed.feedPosts.map((post) => (
-          <PostCard key={post.id} post={post} feed={feed} />
+          <div
+            key={post.id}
+            className={feed.enteringIds.has(post.id) ? "live-enter" : undefined}
+          >
+            <FeedItem post={post} feed={feed} />
+          </div>
         ))}
         {feed.loading && (
           <PostListSkeleton
@@ -101,5 +108,59 @@ export function Feed({
         <div ref={sentinel} aria-hidden="true" className="h-px" />
       )}
     </PullToRefresh>
+  );
+}
+
+// Longer chains above a reply are cut down to the root and the last two posts.
+const MAX_SHOWN_ANCESTORS = 4;
+
+/** A post, preceded by the thread above it when it is a reply. */
+function FeedItem({ post, feed }: { post: Post; feed: FeedState }) {
+  const ancestors = (post.ancestors ?? []).flatMap((ancestor) => {
+    const resolved = feed.resolvePost(ancestor);
+    return resolved ? [resolved] : [];
+  });
+  const repost = feed.repostContext(post);
+  if (ancestors.length === 0) {
+    return <PostCard post={post} feed={feed} repost={repost} replyContext />;
+  }
+  const collapse = ancestors.length > MAX_SHOWN_ANCESTORS;
+  const items: ({ ancestor: Post } | { gap: number })[] = collapse
+    ? [
+        { ancestor: ancestors[0] },
+        { gap: ancestors.length - 3 },
+        ...ancestors.slice(-2).map((ancestor) => ({ ancestor })),
+      ]
+    : ancestors.map((ancestor) => ({ ancestor }));
+  return (
+    <div>
+      {items.map((item, index) =>
+        "gap" in item ? (
+          <div key="gap" className="relative py-2 pl-12">
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-0 left-4.25 w-0.5 rounded-full bg-border"
+            />
+            <Link
+              to={`/posts/${post.id}`}
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              <Ellipsis className="size-3.5" aria-hidden="true" />
+              Show {item.gap} earlier {item.gap === 1 ? "post" : "posts"}
+            </Link>
+          </div>
+        ) : (
+          <PostCard
+            key={item.ancestor.id}
+            post={item.ancestor}
+            feed={feed}
+            compact
+            connectToNext="tight"
+            connectFromPrev={index > 0}
+          />
+        ),
+      )}
+      <PostCard post={post} feed={feed} repost={repost} connectFromPrev />
+    </div>
   );
 }

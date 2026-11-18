@@ -6,6 +6,8 @@ import {
   type PollDraft,
   type VoiceDraft,
   type Post,
+  type RepostAudience,
+  type RepostContext,
   type Session,
 } from "@/lib/api";
 import {
@@ -24,12 +26,19 @@ import {
   subscribeToActions,
 } from "./optimistic-actions";
 import { toast } from "@/components/ui/toast-manager";
+import { projectRepostContext } from "./repost-context";
+import { applyLive } from "./live-insert";
+import { useLiveUpdates } from "./use-live-updates";
 
 // Feed pages (home, or one topic's) survive navigation, so coming back from a post shows the same
 // list instantly (and can restore the scroll position) while it revalidates.
 const feedCache = new Map<
   string,
-  { posts: Post[]; nextCursor: string | null }
+  {
+    posts: Post[];
+    repostedBy: Record<string, RepostContext>;
+    nextCursor: string | null;
+  }
 >();
 
 export function useFeed(
@@ -50,6 +59,10 @@ export function useFeed(
     cacheKey === null ? undefined : feedCache.get(cacheKey),
   );
   const [feedPosts, setFeedPosts] = useState<Post[]>(cached?.posts ?? []);
+  // Which posts are here because someone reposted them (home feed only).
+  const [repostedBy, setRepostedBy] = useState<Record<string, RepostContext>>(
+    cached?.repostedBy ?? {},
+  );
   const [draft, setDraft] = useState("");
   const [nextCursor, setNextCursor] = useState<string | null>(
     cached?.nextCursor ?? null,
@@ -69,6 +82,14 @@ export function useFeed(
   const optimisticPostIds = visibleLocalPosts
     .filter((entry) => entry.status === "sending")
     .map((entry) => entry.post.id);
+  const [enteringIds, setEnteringIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  useEffect(() => {
+    if (!enteringIds.size) return;
+    const timer = window.setTimeout(() => setEnteringIds(new Set()), 700);
+    return () => window.clearTimeout(timer);
+  }, [enteringIds]);
   const canPost = !!session?.authenticated && !session.needsOnboarding;
   const load = useCallback(
     async (cursor?: string, signal?: AbortSignal, revalidate = false) => {
@@ -79,18 +100,24 @@ export function useFeed(
           : await api.posts(cursor, signal, topic);
         if (signal?.aborted) return;
         rememberPosts(page.posts, viewerId, startedAt);
+        // The page is authoritative for the posts it holds, including their order:
+        // a repost can lift an older post back to the top.
+        const pageIds = new Set(page.posts.map((post) => post.id));
+        setRepostedBy((current) =>
+          revalidate || cursor
+            ? {
+                ...Object.fromEntries(
+                  Object.entries(current).filter(([id]) => !pageIds.has(id)),
+                ),
+                ...page.repostedBy,
+              }
+            : page.repostedBy,
+        );
         setFeedPosts((current) =>
           revalidate
             ? [
-                ...page.posts.filter(
-                  (post) =>
-                    !current.some((existing) => existing.id === post.id),
-                ),
-                ...current.map(
-                  (existing) =>
-                    page.posts.find((post) => post.id === existing.id) ??
-                    existing,
-                ),
+                ...page.posts,
+                ...current.filter((existing) => !pageIds.has(existing.id)),
               ]
             : cursor
               ? [
@@ -115,8 +142,8 @@ export function useFeed(
   );
   useEffect(() => {
     if (cacheKey === null) return;
-    feedCache.set(cacheKey, { posts: feedPosts, nextCursor });
-  }, [cacheKey, feedPosts, nextCursor]);
+    feedCache.set(cacheKey, { posts: feedPosts, repostedBy, nextCursor });
+  }, [cacheKey, feedPosts, repostedBy, nextCursor]);
   useEffect(() => {
     if (!autoLoad) return;
     const controller = new AbortController();
@@ -125,6 +152,59 @@ export function useFeed(
     void load(undefined, controller.signal, !!cached);
     return () => controller.abort();
   }, [load, session, autoLoad, cached]);
+  useLiveUpdates({
+    enabled: autoLoad && parentId === undefined,
+    scope: `${viewerId ?? "anonymous"}|${topic ?? ""}`,
+    relevant: (live) =>
+      (topic
+        ? live.topics.includes(topic)
+        : live.parentId === null || live.reposted) &&
+      !localIds.has(live.id) &&
+      !feedPosts.some((post) => post.id === live.id),
+    refresh: async (signal) => {
+      const startedAt = getActionRevision();
+      const page = await api.posts(undefined, signal, topic);
+      if (signal.aborted) return;
+      const known = new Set([...localIds, ...feedPosts.map((post) => post.id)]);
+      const fresh = page.posts.filter((post) => !known.has(post.id));
+      if (!fresh.length) return;
+      const contiguous =
+        known.size === 0 ||
+        !page.nextCursor ||
+        page.posts.some((post) => known.has(post.id));
+      rememberPosts(page.posts, viewerId, startedAt);
+      await applyLive(
+        signal,
+        (atTop) => {
+          if (contiguous) {
+            const freshIds = new Set(fresh.map((post) => post.id));
+            setFeedPosts((current) => [
+              ...fresh.filter(
+                (post) => !current.some((existing) => existing.id === post.id),
+              ),
+              ...current,
+            ]);
+            setRepostedBy((current) => ({
+              ...current,
+              ...Object.fromEntries(
+                Object.entries(page.repostedBy).filter(([id]) =>
+                  freshIds.has(id),
+                ),
+              ),
+            }));
+            if (atTop)
+              setEnteringIds((current) => new Set([...current, ...freshIds]));
+          } else if (atTop) {
+            setFeedPosts(page.posts);
+            setRepostedBy(page.repostedBy);
+            setNextCursor(page.nextCursor);
+          }
+          acknowledgePosts(page.posts);
+        },
+        { followTop: true },
+      );
+    },
+  });
   function publishPost(
     text: string = draft,
     gif: GifSearchItem | null = null,
@@ -150,6 +230,34 @@ export function useFeed(
     });
     setDraft("");
     return sending;
+  }
+  /** Quote a post: a new top-level post embedding it, whatever feed this is. */
+  function publishQuote(
+    quoted: Post,
+    text: string,
+    gif: GifSearchItem | null = null,
+    poll?: PollDraft,
+    onConfirmed?: (post: Post) => void,
+    voice?: VoiceDraft,
+  ) {
+    const content = text.trim();
+    if (
+      !session?.authenticated ||
+      session.needsOnboarding ||
+      (!content && !gif && !poll && !voice) ||
+      Array.from(content).length > 2000
+    )
+      return;
+    return publishOptimistically({
+      content,
+      gif,
+      poll,
+      voice,
+      author: session.user,
+      parentId: null,
+      quoting: quoted,
+      onConfirmed,
+    });
   }
   async function sharePost(post: Post) {
     const url = new URL(`/posts/${post.id}`, window.location.origin).href;
@@ -190,8 +298,28 @@ export function useFeed(
       .filter((post) => post !== null)
       .filter((post) => !topic || post.topics.includes(topic)),
     resolvePost: (post: Post) => projectPost(post, viewerId),
+    /**
+     * The "X reposted" label for a post in this list. Pass `base` and turn
+     * `synthesize` off for lists that bring their own context, such as a profile.
+     */
+    repostContext: (
+      post: Post,
+      base: RepostContext | undefined = repostedBy[post.id],
+      // Only the home feed lists reposts; topic and reply lists never do.
+      synthesize = !topic && parentId === undefined,
+    ) =>
+      projectRepostContext(
+        post,
+        base,
+        session?.authenticated && !session.needsOnboarding
+          ? session.user
+          : null,
+        synthesize,
+      ),
+    publishQuote,
     viewerReposts: viewerId ? cachedReposts(viewerId) : [],
     optimisticPostIds,
+    enteringIds,
     draft,
     setDraft,
     publishPost,
@@ -217,9 +345,14 @@ export function useFeed(
       viewerId
         ? mutatePost(post, viewerId, { kind: "like", value: !post.liked })
         : false,
-    toggleRepost: (post: Post) =>
+    /** Repost with an audience, or undo the repost with `null`. */
+    setRepost: (post: Post, audience: RepostAudience | null) =>
       viewerId
-        ? mutatePost(post, viewerId, { kind: "repost", value: !post.reposted })
+        ? mutatePost(post, viewerId, {
+            kind: "repost",
+            value: audience !== null,
+            audience: audience ?? "public",
+          })
         : false,
     isVoting: (post: Post) => !!viewerId && isVoting(post.id, viewerId),
     vote: (post: Post, optionIndex: number) =>

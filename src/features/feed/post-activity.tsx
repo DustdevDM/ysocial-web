@@ -22,6 +22,7 @@ type ActivityType = Parameters<typeof api.postActivity>[1];
 const emptyActivity: Record<ActivityType, string> = {
   likes: "No likes yet.",
   reposts: "No reposts yet.",
+  quotes: "No quotes yet.",
   voters: "No votes yet.",
 };
 
@@ -102,7 +103,7 @@ function ActivityList({
             className="transition-opacity duration-300 ease-in-out starting:opacity-0 motion-reduce:transition-none"
           >
             <Link
-              to={`/@${user.handle}`}
+              to={type === "quotes" && user.quoteId ? `/posts/${user.quoteId}` : `/@${user.handle}`}
               onClick={onNavigate}
               className="flex items-center gap-3 rounded-lg px-2 py-3 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -125,6 +126,9 @@ function ActivityList({
                 <p className="truncate text-xs text-muted-foreground">
                   @{user.handle}
                 </p>
+                {type === "quotes" && (
+                  <p className="mt-1 text-xs">Quoted this post · view quote</p>
+                )}
                 {user.optionLabel && (
                   <p className="mt-1 text-xs wrap-anywhere">Voted for {user.optionLabel}</p>
                 )}
@@ -252,7 +256,7 @@ export function PostActivity({
         <DialogHeader>
           <DialogTitle>Post activity</DialogTitle>
           <DialogDescription>
-            {voterOptions ? "See who liked, reposted, or voted." : "See who liked or reposted this post."}
+            {voterOptions ? "See who liked, reposted, quoted, or voted." : "See who liked, reposted, or quoted this post."}
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="likes" className="min-w-0 gap-3">
@@ -262,6 +266,9 @@ export function PostActivity({
             </TabsTrigger>
             <TabsTrigger value="reposts" className="rounded-full">
               Reposts
+            </TabsTrigger>
+            <TabsTrigger value="quotes" className="rounded-full">
+              Quotes
             </TabsTrigger>
             {voterOptions && (
               <TabsTrigger value="voters" className="rounded-full">
@@ -284,6 +291,13 @@ export function PostActivity({
               className="col-start-1 row-start-1 min-h-0 transition-opacity duration-300 ease-in-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none"
             >
               <ActivityList postId={postId} type="reposts" onNavigate={close} />
+            </TabsContent>
+            <TabsContent
+              value="quotes"
+              keepMounted
+              className="col-start-1 row-start-1 min-h-0 transition-opacity duration-300 ease-in-out data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-reduce:transition-none"
+            >
+              <ActivityList postId={postId} type="quotes" onNavigate={close} />
             </TabsContent>
             {voterOptions && (
               <TabsContent

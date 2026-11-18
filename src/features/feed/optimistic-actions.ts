@@ -6,6 +6,7 @@ import {
   type Post,
   type Poll,
   type Profile,
+  type RepostAudience,
 } from "@/lib/api";
 import { showRetryToast as retryToast } from "@/lib/retry-toast";
 import { toast } from "@/components/ui/toast-manager";
@@ -13,7 +14,7 @@ import { extractTopics } from "@/lib/topics";
 
 type PostCommand =
   | { kind: "like"; value: boolean }
-  | { kind: "repost"; value: boolean }
+  | { kind: "repost"; value: boolean; audience: RepostAudience }
   | { kind: "vote"; optionIndex: number }
   | { kind: "edit"; content: string; editedAt: string }
   | { kind: "delete" };
@@ -111,6 +112,17 @@ export function rememberPosts(
   if (changed) notify();
 }
 
+export function forgetPosts(ids: string[], viewerId: string | null) {
+  let changed = false;
+  for (const id of ids) {
+    const key = keyFor(viewerId, id);
+    if (deleted.has(key)) continue;
+    deleted.add(key);
+    changed = true;
+  }
+  if (changed) notify();
+}
+
 export function rememberPollResults(
   results: { id: string; poll: Poll }[],
   viewerId: string | null,
@@ -145,15 +157,20 @@ function applyPost(post: Post, command: PostCommand): Post {
           post.likes + Number(command.value) - Number(post.liked),
         ),
       };
-    case "repost":
+    case "repost": {
+      // Only public reposts count; a friends-only one changes just the viewer's own state.
+      const audience = command.value ? command.audience : null;
+      const wasPublic = post.reposted && post.repostAudience !== "friends";
       return {
         ...post,
         reposted: command.value,
+        repostAudience: audience,
         reposts: Math.max(
           0,
-          post.reposts + Number(command.value) - Number(post.reposted),
+          post.reposts + Number(audience === "public") - Number(wasPublic),
         ),
       };
+    }
     case "edit":
       return {
         ...post,
@@ -273,7 +290,7 @@ export function mutatePost(
               patch = await api.like(post.id, command.value);
               break;
             case "repost":
-              patch = await api.repost(post.id, command.value);
+              patch = await api.repost(post.id, command.value, command.audience);
               break;
             case "vote":
               patch = await api.vote(post.id, command.optionIndex);

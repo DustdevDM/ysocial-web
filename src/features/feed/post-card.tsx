@@ -10,10 +10,12 @@ import { MentionTextarea } from "./mention-textarea";
 import { PostActions } from "./post-actions";
 import { PostText } from "./post-text";
 import { PostPoll } from "./post-poll";
+import { QuotedPostCard } from "./quoted-post";
+import { RepostHeader } from "./repost-header";
 import { AvatarCircles } from "@/components/ui/avatar-circles";
 import { EditHistory } from "./edit-history";
 import { cn } from "@/lib/utils";
-import type { Post } from "@/lib/api";
+import type { Post, RepostContext } from "@/lib/api";
 import {
   JUMBO_MAX,
   emojiOnlyCount,
@@ -24,6 +26,7 @@ import {
 } from "@/lib/emoji";
 import { useEmojiIndex } from "@/lib/use-emoji-index";
 import type { FeedState } from "./use-feed";
+import { watchPost } from "./live-states";
 
 export function PostCard({
   post,
@@ -33,6 +36,8 @@ export function PostCard({
   connectFromPrev = false,
   compact = false,
   focused = false,
+  repost = null,
+  replyContext = false,
 }: {
   post: Post;
   feed: FeedState;
@@ -45,6 +50,10 @@ export function PostCard({
   compact?: boolean;
   /** The post a thread page is about: not clickable, slightly larger text. */
   focused?: boolean;
+  /** Why this post is in the list: someone reposted it. */
+  repost?: RepostContext | null;
+  /** Say who a reply answers, for replies shown outside their thread. */
+  replyContext?: boolean;
 }) {
   const navigate = useNavigate();
   const editorId = useId();
@@ -57,6 +66,11 @@ export function PostCard({
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
+  const articleRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const element = articleRef.current;
+    return element ? watchPost(element, post.id, feed.viewerId) : undefined;
+  }, [post.id, feed.viewerId]);
   const optimistic = feed.optimisticPostIds.includes(post.id);
   const mine = post.author.id === feed.viewerId;
   const busy = feed.pending.includes(post.id);
@@ -118,6 +132,7 @@ export function PostCard({
   }
   return (
     <article
+      ref={articleRef}
       id={`post-${post.id}`}
       onClick={openPost}
       className={cn(
@@ -149,6 +164,7 @@ export function PostCard({
           )}
         />
       )}
+      {repost && <RepostHeader repost={repost} viewerId={feed.viewerId} />}
       <div className="flex items-start gap-3">
         <div className="relative size-9 shrink-0">
           <div
@@ -268,6 +284,17 @@ export function PostCard({
               </div>
             )}
           </div>
+          {replyContext && post.replyTo && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Replying to{" "}
+              <Link
+                to={`/@${post.replyTo.handle}`}
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                @{post.replyTo.handle}
+              </Link>
+            </p>
+          )}
           {editing ? (
             <div className="mt-2 space-y-2">
               <label htmlFor={editorId} className="sr-only">
@@ -352,6 +379,7 @@ export function PostCard({
               className="mt-2 max-h-96 w-auto max-w-full rounded-xl object-contain"
             />
           )}
+          {post.quote && <QuotedPostCard quote={post.quote} />}
           {post.poll && (
             <PostPoll
               postId={post.id}

@@ -10,11 +10,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { api, ApiError, errorMessage, retryRequest, type Session } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  errorMessage,
+  retryRequest,
+  type Session,
+} from "@/lib/api";
 import { ProfileCardSkeleton } from "@/components/loading-skeletons";
 import { BannerImage } from "@/features/profile/banner-image";
 import { BannerEditor } from "@/features/profile/banner-editor";
 import { AvatarCropper } from "@/features/profile/avatar-cropper";
+import { RecentAvatars } from "@/features/profile/recent-avatars";
 import { ProfileForm } from "@/features/profile/profile-form";
 import { updateAuthor } from "@/features/feed/optimistic-actions";
 import type { AuthState } from "@/features/auth/use-auth";
@@ -118,6 +125,17 @@ export function ProfileCard({
                 </DialogDescription>
               </DialogHeader>
               <AvatarCropper
+                emptyFooter={
+                  <RecentAvatars
+                    onSelect={async (id, signal) => {
+                      await verifyAccount(user.id, signal);
+                      const result = await api.selectRecentAvatar(id, signal);
+                      updateAuthor(user.id, { avatarUrl: result.avatarUrl });
+                      auth.updateAvatar(user.id, result.avatarUrl);
+                      setPictureOpen(false);
+                    }}
+                  />
+                }
                 onSave={async (picture, signal) => {
                   const result = await retryRequest(
                     () => api.uploadAvatar(picture, signal),
