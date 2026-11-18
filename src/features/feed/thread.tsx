@@ -201,7 +201,13 @@ export function Thread({
         <h1 className="text-lg font-semibold">
           {data?.ancestors.length ? "Thread" : "Post"}
         </h1>
-        {post && !error && <PostActivity key={post.id} postId={post.id} />}
+        {post && !error && (
+          <PostActivity
+            key={post.id}
+            postId={post.id}
+            poll={post.poll}
+          />
+        )}
       </header>
       {wasDeleted ? (
         <p role="status" className="py-6 text-sm text-muted-foreground">

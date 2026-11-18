@@ -3,6 +3,7 @@ import {
   api,
   errorMessage,
   type GifSearchItem,
+  type PollDraft,
   type Post,
   type Session,
 } from "@/lib/api";
@@ -16,6 +17,7 @@ import {
   cachedReposts,
   getActionRevision,
   mutatePost,
+  isVoting,
   projectPost,
   rememberPosts,
   subscribeToActions,
@@ -122,18 +124,23 @@ export function useFeed(
     void load(undefined, controller.signal, !!cached);
     return () => controller.abort();
   }, [load, session, autoLoad, cached]);
-  function publishPost(text: string = draft, gif: GifSearchItem | null = null) {
+  function publishPost(
+    text: string = draft,
+    gif: GifSearchItem | null = null,
+    poll?: PollDraft,
+  ) {
     const content = text.trim();
     if (
       !session?.authenticated ||
       session.needsOnboarding ||
-      (!content && !gif) ||
+      (!content && !gif && !poll) ||
       Array.from(content).length > 2000
     )
       return;
     const sending = publishOptimistically({
       content,
       gif,
+      poll,
       author: session.user,
       parentId: parentId ?? null,
       onConfirmed: onPublished,
@@ -211,10 +218,15 @@ export function useFeed(
       viewerId
         ? mutatePost(post, viewerId, { kind: "repost", value: !post.reposted })
         : false,
+    isVoting: (post: Post) => !!viewerId && isVoting(post.id, viewerId),
+    vote: (post: Post, optionIndex: number) =>
+      viewerId
+        ? mutatePost(post, viewerId, { kind: "vote", optionIndex })
+        : false,
     editPost: (post: Post, content: string) => {
       const trimmed = content.trim();
       return viewerId &&
-        (trimmed || post.gif) &&
+        (trimmed || post.gif || post.poll) &&
         Array.from(trimmed).length <= 2000
         ? mutatePost(post, viewerId, {
             kind: "edit",

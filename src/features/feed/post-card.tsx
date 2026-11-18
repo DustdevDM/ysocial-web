@@ -8,6 +8,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { MentionTextarea } from "./mention-textarea";
 import { PostActions } from "./post-actions";
 import { PostText } from "./post-text";
+import { PostPoll } from "./post-poll";
 import { AvatarCircles } from "@/components/ui/avatar-circles";
 import { EditHistory } from "./edit-history";
 import { cn } from "@/lib/utils";
@@ -63,7 +64,8 @@ export function PostCard({
     ? renderShortcodes(content, emojiIndex)
     : content;
   const length = Array.from(finalContent.trim()).length;
-  const validCaption = (length > 0 || post.gif !== null) && length <= 2000;
+  const hasAttachment = Boolean(post.gif || post.poll);
+  const validCaption = (length > 0 || hasAttachment) && length <= 2000;
   const changed = finalContent.trim() !== post.content.trim();
   const jumbo = post.gif ? 0 : emojiOnlyCount(post.content);
   const profilePath = `/@${post.author.handle}`;
@@ -76,7 +78,7 @@ export function PostCard({
     const target = event.target as HTMLElement;
     // Portals (dialogs, tooltips) bubble through React but are not inside the card.
     if (!event.currentTarget.contains(target)) return;
-    if (target.closest("a, button, input, textarea, label, [role='button']"))
+    if (target.closest("a, button, input, textarea, label, [role='button'], [data-slot='tooltip-trigger']"))
       return;
     // Dragging to select ends in a click too; keep the selection.
     if (window.getSelection()?.toString()) return;
@@ -302,7 +304,7 @@ export function PostCard({
                 className="flex justify-between gap-3 text-xs text-muted-foreground"
               >
                 <p>
-                  {!length && !post.gif
+                  {!length && !hasAttachment
                     ? "Write something before saving."
                     : length > 2000
                       ? `Remove ${length - 2000} characters to save.`
@@ -339,6 +341,14 @@ export function PostCard({
               loading="lazy"
               decoding="async"
               className="mt-2 max-h-96 w-auto max-w-full rounded-xl object-contain"
+            />
+          )}
+          {post.poll && (
+            <PostPoll
+              poll={post.poll}
+              canVote={feed.canPost && !optimistic}
+              voting={feed.isVoting(post)}
+              onVote={(optionIndex) => feed.vote(post, optionIndex)}
             />
           )}
           <PostActions post={post} feed={feed} />

@@ -14,7 +14,21 @@ const userSchema = z.object({
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
 });
+const activityUserSchema = userSchema.extend({ optionLabel: z.string().optional() });
 const postGifSchema = z.object({ url: z.string(), title: z.string() });
+export const pollDraftSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  options: z.array(z.string().trim().min(1).max(80)).min(2).max(6).refine(
+    (options) => new Set(options.map((option) => option.toLowerCase())).size === options.length,
+  ),
+  anonymous: z.boolean(),
+});
+const pollSchema = pollDraftSchema.extend({
+  options: z.array(z.object({ label: z.string(), votes: z.number().int().nonnegative() })),
+  selectedOption: z.number().int().nonnegative().nullable(),
+});
+export type PollDraft = z.infer<typeof pollDraftSchema>;
+export type Poll = z.infer<typeof pollSchema>;
 const postSchema = z.object({
   mentions: z
     .array(
@@ -25,6 +39,7 @@ const postSchema = z.object({
   parentId: z.string().nullable(),
   content: z.string(),
   gif: postGifSchema.nullable().default(null),
+  poll: pollSchema.nullable().default(null),
   createdAt: z.string(),
   editedAt: z.string().nullable(),
   editExpiresAt: z.string(),
@@ -135,6 +150,9 @@ const traceCodes: Record<string, number> = {
   invalid_post_id: 2005,
   post_id_conflict: 2006,
   invalid_topic: 2007,
+  poll_not_found: 2008,
+  invalid_poll_option: 2009,
+  poll_is_anonymous: 2011,
   // profile
   profile_not_found: 3001,
   invalid_profile: 3002,
@@ -288,6 +306,8 @@ function friendlyMessage(error: unknown) {
       return "This picture is too large. Choose a smaller image.";
     if (error.message === "post_not_found")
       return "This post no longer exists.";
+    if (error.message === "invalid_poll_option")
+      return "Choose an option from this poll.";
     if (error.message === "invalid_topic") return "This isn't a valid topic.";
     if (error.message === "retry_account_changed")
       return "Sign in to the original account before retrying this action.";
@@ -571,20 +591,27 @@ export const api = {
     ),
   postActivity: (
     id: string,
-    type: "likes" | "reposts",
-    cursor?: string,
-    signal?: AbortSignal,
-  ) =>
-    request(
-      `${postPath(id)}/activity?type=${type}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    type: "likes" | "reposts" | "voters",
+    { cursor, signal, options }: { cursor?: string; signal?: AbortSignal; options?: readonly number[] },
+  ) => {
+    const params = new URLSearchParams();
+    if (type !== "voters") params.set("type", type);
+    if (type === "voters") {
+      for (const option of options ?? []) params.append("option", String(option));
+    }
+    if (cursor) params.set("cursor", cursor);
+    const path = type === "voters" ? "poll/voters" : "activity";
+    return request(
+      `${postPath(id)}/${path}${params.size ? `?${params}` : ""}`,
       z.object({
-        users: z.array(userSchema),
+        users: z.array(activityUserSchema),
         nextCursor: z.string().nullable(),
       }),
       "GET",
       undefined,
       signal,
-    ),
+    );
+  },
   mentionSuggestions: (query: string, signal?: AbortSignal) =>
     request(
       `/api/profiles/suggestions?q=${encodeURIComponent(query)}`,
@@ -593,11 +620,12 @@ export const api = {
       undefined,
       signal,
     ),
-  publish: (content: string, clientId?: string, gifToken?: string) =>
+  publish: (content: string, clientId?: string, gifToken?: string, poll?: PollDraft) =>
     request("/api/posts", postResponseSchema, "POST", {
       content,
       clientId,
       gifToken,
+      poll,
     }),
   replies: (id: string, cursor?: string, signal?: AbortSignal) =>
     request(
@@ -607,12 +635,15 @@ export const api = {
       undefined,
       signal,
     ),
-  reply: (id: string, content: string, clientId?: string, gifToken?: string) =>
+  reply: (id: string, content: string, clientId?: string, gifToken?: string, poll?: PollDraft) =>
     request(`${postPath(id)}/replies`, postResponseSchema, "POST", {
       content,
       clientId,
       gifToken,
+      poll,
     }),
+  vote: (id: string, optionIndex: number) =>
+    request(`${postPath(id)}/poll/vote`, z.object({ poll: pollSchema }), "PUT", { optionIndex }),
   like: (id: string, liked: boolean) =>
     request(
       `${postPath(id)}/like`,

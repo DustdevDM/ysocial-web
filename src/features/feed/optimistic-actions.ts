@@ -1,16 +1,19 @@
 import {
   api,
   ApiError,
+  errorMessage,
   retryRequest,
   type Post,
   type Profile,
 } from "@/lib/api";
 import { showRetryToast as retryToast } from "@/lib/retry-toast";
+import { toast } from "@/components/ui/toast-manager";
 import { extractTopics } from "@/lib/topics";
 
 type PostCommand =
   | { kind: "like"; value: boolean }
   | { kind: "repost"; value: boolean }
+  | { kind: "vote"; optionIndex: number }
   | { kind: "edit"; content: string; editedAt: string }
   | { kind: "delete" };
 type PostOperation = { id: string; command: PostCommand };
@@ -136,6 +139,7 @@ function applyPost(post: Post, command: PostCommand): Post {
         editedAt: command.editedAt,
         topics: extractTopics(command.content),
       };
+    case "vote":
     case "delete":
       return post;
     default: {
@@ -214,6 +218,12 @@ export function beginReply(parentId: string, viewerId: string) {
   };
 }
 
+export function isVoting(postId: string, viewerId: string) {
+  return postOperations.get(keyFor(viewerId, postId))?.some(
+    ({ command }) => command.kind === "vote",
+  ) ?? false;
+}
+
 export function mutatePost(
   post: Post,
   viewerId: string,
@@ -221,6 +231,7 @@ export function mutatePost(
   retry = false,
 ) {
   const key = keyFor(viewerId, post.id);
+  if (command.kind === "vote" && isVoting(post.id, viewerId)) return false;
   if (!posts.has(key)) posts.set(key, { value: post, revision });
   const operation = { id: crypto.randomUUID(), command };
   postOperations.set(key, [...(postOperations.get(key) ?? []), operation]);
@@ -241,6 +252,9 @@ export function mutatePost(
               break;
             case "repost":
               patch = await api.repost(post.id, command.value);
+              break;
+            case "vote":
+              patch = await api.vote(post.id, command.optionIndex);
               break;
             case "edit": {
               const { post: saved } = await api.edit(post.id, command.content);
@@ -303,6 +317,14 @@ export function mutatePost(
       notify();
     }
     if (failed) {
+      if (command.kind === "vote") {
+        toast.add({
+          type: "error",
+          title: "Couldn't save vote",
+          description: errorMessage(failure),
+        });
+        return;
+      }
       const titles = {
         like: "Couldn't update like",
         repost: "Couldn't update repost",
