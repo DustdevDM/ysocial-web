@@ -76,7 +76,12 @@ export function Feed({
           </div>
         )}
         {feed.feedPosts.map((post) => (
-          <FeedItem key={post.id} post={post} feed={feed} />
+          <div
+            key={post.id}
+            className={feed.enteringIds.has(post.id) ? "live-enter" : undefined}
+          >
+            <FeedItem post={post} feed={feed} />
+          </div>
         ))}
         {feed.loading && (
           <PostListSkeleton
