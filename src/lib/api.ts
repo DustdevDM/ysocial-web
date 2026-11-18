@@ -25,7 +25,10 @@ export type RepostAudience = z.infer<typeof repostAudienceSchema>;
 const quotedPostSchema = z.object({
   id: z.string(),
   content: z.string(),
-  gif: z.object({ url: z.string(), title: z.string() }).nullable().default(null),
+  gif: z
+    .object({ url: z.string(), title: z.string() })
+    .nullable()
+    .default(null),
   createdAt: z.string(),
   editedAt: z.string().nullable(),
   parentId: z.string().nullable(),
@@ -50,13 +53,21 @@ const repostedBySchema = z.record(z.string(), repostContextSchema).default({});
 const postGifSchema = z.object({ url: z.string(), title: z.string() });
 export const pollDraftSchema = z.object({
   title: z.string().trim().min(1).max(120),
-  options: z.array(z.string().trim().min(1).max(80)).min(2).max(6).refine(
-    (options) => new Set(options.map((option) => option.toLowerCase())).size === options.length,
-  ),
+  options: z
+    .array(z.string().trim().min(1).max(80))
+    .min(2)
+    .max(6)
+    .refine(
+      (options) =>
+        new Set(options.map((option) => option.toLowerCase())).size ===
+        options.length,
+    ),
   anonymous: z.boolean(),
 });
 const pollSchema = pollDraftSchema.extend({
-  options: z.array(z.object({ label: z.string(), votes: z.number().int().nonnegative() })),
+  options: z.array(
+    z.object({ label: z.string(), votes: z.number().int().nonnegative() }),
+  ),
   selectedOption: z.number().int().nonnegative().nullable(),
 });
 export type PollDraft = z.infer<typeof pollDraftSchema>;
@@ -115,7 +126,10 @@ const postResponseSchema = z.object({
 const websiteLinkSchema = z.object({
   href: z.string(),
   title: z.string(),
-  iconKey: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  iconKey: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
 });
 const imagePreviewKeySchema = z.string().regex(/^[0-9a-f]{64}$/);
 const pagePreviewSchema = websiteLinkSchema.extend({
@@ -126,7 +140,10 @@ const pagePreviewSchema = websiteLinkSchema.extend({
 });
 const websitePreviewSchema = z.union([
   pagePreviewSchema,
-  websiteLinkSchema.extend({ kind: z.literal("image"), imageKey: imagePreviewKeySchema }),
+  websiteLinkSchema.extend({
+    kind: z.literal("image"),
+    imageKey: imagePreviewKeySchema,
+  }),
 ]);
 const websitePreviewsSchema = z.object({
   links: z.array(websiteLinkSchema).default([]),
@@ -250,6 +267,7 @@ const traceCodes: Record<string, number> = {
   invalid_banner: 5006,
   invalid_banner_crop: 5007,
   banner_not_found: 5008,
+  avatar_in_use: 5009,
   // gif
   invalid_gif_selection: 6001,
   invalid_search: 6002,
@@ -368,6 +386,8 @@ function friendlyMessage(error: unknown) {
       return "Choose a JPEG, PNG, AVIF, WebP or GIF under 10 MB. Animated images must have no more than 120 frames.";
     if (error.message === "avatar_storage_not_configured")
       return "Profile picture uploads are not configured yet.";
+    if (error.message === "avatar_not_found")
+      return "This picture is no longer available.";
     if (error.message === "avatar_storage_unavailable")
       return "Picture storage is temporarily unavailable. Please try again.";
     if (
@@ -393,7 +413,8 @@ function friendlyMessage(error: unknown) {
     if (error.status === 0)
       return "You seem to be offline. Check your connection and try again.";
     if (error.status === 403) return "You don't have permission to do that.";
-    if (error.status === 404) return "We couldn't find what you were looking for.";
+    if (error.status === 404)
+      return "We couldn't find what you were looking for.";
     if (error.status === 429)
       return "Too many requests. Wait a moment, then try again.";
     if (error.status >= 500)
@@ -606,6 +627,32 @@ export const api = {
       picture,
       signal,
     ),
+  recentAvatars: (signal?: AbortSignal) =>
+    request(
+      "/api/avatars/recent",
+      z.object({
+        avatars: z.array(z.object({ id: z.string(), avatarUrl: z.string() })),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
+  selectRecentAvatar: (id: string, signal?: AbortSignal) =>
+    request(
+      `/api/avatars/recent/${encodeURIComponent(id)}`,
+      z.object({ avatarUrl: z.string() }),
+      "POST",
+      undefined,
+      signal,
+    ),
+  removeRecentAvatar: (id: string, signal?: AbortSignal) =>
+    request(
+      `/api/avatars/recent/${encodeURIComponent(id)}`,
+      z.undefined(),
+      "DELETE",
+      undefined,
+      signal,
+    ),
   logout: () => request("/auth/logout", z.undefined(), "POST"),
   posts: (cursor?: string, signal?: AbortSignal, topic?: string) => {
     const query = new URLSearchParams();
@@ -679,12 +726,17 @@ export const api = {
   postActivity: (
     id: string,
     type: "likes" | "reposts" | "quotes" | "voters",
-    { cursor, signal, options }: { cursor?: string; signal?: AbortSignal; options?: readonly number[] },
+    {
+      cursor,
+      signal,
+      options,
+    }: { cursor?: string; signal?: AbortSignal; options?: readonly number[] },
   ) => {
     const params = new URLSearchParams();
     if (type !== "voters") params.set("type", type);
     if (type === "voters") {
-      for (const option of options ?? []) params.append("option", String(option));
+      for (const option of options ?? [])
+        params.append("option", String(option));
     }
     if (cursor) params.set("cursor", cursor);
     const path = type === "voters" ? "poll/voters" : "activity";
@@ -729,7 +781,13 @@ export const api = {
       undefined,
       signal,
     ),
-  reply: (id: string, content: string, clientId?: string, gifToken?: string, poll?: PollDraft) =>
+  reply: (
+    id: string,
+    content: string,
+    clientId?: string,
+    gifToken?: string,
+    poll?: PollDraft,
+  ) =>
     request(`${postPath(id)}/replies`, postResponseSchema, "POST", {
       content,
       clientId,
@@ -737,7 +795,12 @@ export const api = {
       poll,
     }),
   vote: (id: string, optionIndex: number) =>
-    request(`${postPath(id)}/poll/vote`, z.object({ poll: pollSchema }), "PUT", { optionIndex }),
+    request(
+      `${postPath(id)}/poll/vote`,
+      z.object({ poll: pollSchema }),
+      "PUT",
+      { optionIndex },
+    ),
   pollResults: (ids: string[], signal: AbortSignal) =>
     sendRequest(
       `/api/posts/poll-results?ids=${encodeURIComponent(ids.join(","))}`,
@@ -755,7 +818,11 @@ export const api = {
       z.object({ likes: z.number(), liked: z.boolean() }),
       liked ? "PUT" : "DELETE",
     ),
-  repost: (id: string, reposted: boolean, audience: RepostAudience = "public") =>
+  repost: (
+    id: string,
+    reposted: boolean,
+    audience: RepostAudience = "public",
+  ) =>
     request(
       `${postPath(id)}/repost`,
       z.object({

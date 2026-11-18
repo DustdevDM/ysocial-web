@@ -21,6 +21,7 @@ import {
 } from "@/lib/api";
 import type { AuthState } from "@/features/auth/use-auth";
 import { AvatarCropper } from "@/features/profile/avatar-cropper";
+import { RecentAvatars } from "@/features/profile/recent-avatars";
 import { BannerEditor } from "@/features/profile/banner-editor";
 
 import { updateAuthor } from "@/features/feed/optimistic-actions";
@@ -121,6 +122,17 @@ function ProfileSettings({
               </DialogDescription>
             </DialogHeader>
             <AvatarCropper
+              emptyFooter={
+                <RecentAvatars
+                  onSelect={async (id, signal) => {
+                    await verifyAccount(signal);
+                    const result = await api.selectRecentAvatar(id, signal);
+                    updateAuthor(user.id, { avatarUrl: result.avatarUrl });
+                    auth.updateAvatar(user.id, result.avatarUrl);
+                    setAvatarOpen(false);
+                  }}
+                />
+              }
               onSave={async (picture, signal) => {
                 await verifyAccount(signal);
                 const result = await api.uploadAvatar(picture, signal);

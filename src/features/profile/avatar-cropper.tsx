@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { exportCrop } from "@zriz/core/dom";
 import { useZoom, type Cropper as CropperApi } from "@zriz/react";
 import * as Cropper from "@zriz/react/cropper";
@@ -30,8 +30,10 @@ function ZoomSlider() {
 
 export function AvatarCropper({
   onSave,
+  emptyFooter,
 }: {
   onSave: (picture: Blob, signal: AbortSignal) => Promise<void>;
+  emptyFooter?: ReactNode;
 }) {
   const [photo, setPhoto] = useState<{ file: File; id: number } | null>(null);
   const [status, setStatus] = useState<
@@ -147,6 +149,7 @@ export function AvatarCropper({
         </button>
       )}
       {fileError && <p role="alert">{fileError}</p>}
+      {!photo && emptyFooter}
       {photo && (
         <Cropper.Root
           key={photo.id}
