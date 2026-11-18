@@ -4,6 +4,7 @@ import {
   errorMessage,
   type GifSearchItem,
   type PollDraft,
+  type VoiceDraft,
   type Post,
   type Session,
 } from "@/lib/api";
@@ -128,12 +129,13 @@ export function useFeed(
     text: string = draft,
     gif: GifSearchItem | null = null,
     poll?: PollDraft,
+    voice?: VoiceDraft,
   ) {
     const content = text.trim();
     if (
       !session?.authenticated ||
       session.needsOnboarding ||
-      (!content && !gif && !poll) ||
+      (!content && !gif && !poll && !voice) ||
       Array.from(content).length > 2000
     )
       return;
@@ -141,6 +143,7 @@ export function useFeed(
       content,
       gif,
       poll,
+      voice,
       author: session.user,
       parentId: parentId ?? null,
       onConfirmed: onPublished,
@@ -226,7 +229,7 @@ export function useFeed(
     editPost: (post: Post, content: string) => {
       const trimmed = content.trim();
       return viewerId &&
-        (trimmed || post.gif || post.poll) &&
+        (trimmed || post.gif || post.poll || post.voice) &&
         Array.from(trimmed).length <= 2000
         ? mutatePost(post, viewerId, {
             kind: "edit",

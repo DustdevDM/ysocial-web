@@ -3,3 +3,6 @@ packages: []
 allowBuilds:
   esbuild: true
   msw: false
+
+patchedDependencies:
+  react-audio-visualize: patches/react-audio-visualize.patch
