@@ -112,6 +112,17 @@ export function rememberPosts(
   if (changed) notify();
 }
 
+export function forgetPosts(ids: string[], viewerId: string | null) {
+  let changed = false;
+  for (const id of ids) {
+    const key = keyFor(viewerId, id);
+    if (deleted.has(key)) continue;
+    deleted.add(key);
+    changed = true;
+  }
+  if (changed) notify();
+}
+
 export function rememberPollResults(
   results: { id: string; poll: Poll }[],
   viewerId: string | null,

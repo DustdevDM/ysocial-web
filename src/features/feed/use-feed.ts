@@ -155,7 +155,9 @@ export function useFeed(
     enabled: autoLoad && parentId === undefined,
     scope: `${viewerId ?? "anonymous"}|${topic ?? ""}`,
     relevant: (live) =>
-      (topic ? live.topics.includes(topic) : live.parentId === null) &&
+      (topic
+        ? live.topics.includes(topic)
+        : live.parentId === null || live.reposted) &&
       !localIds.has(live.id) &&
       !feedPosts.some((post) => post.id === live.id),
     refresh: async (signal) => {

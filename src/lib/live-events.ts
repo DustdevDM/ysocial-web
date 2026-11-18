@@ -5,10 +5,16 @@ const livePostSchema = z.object({
   parentId: z.string().nullable(),
   authorId: z.string(),
   topics: z.array(z.string()),
+  reposted: z.boolean().default(false),
 });
+const liveChangeSchema = z.object({ ids: z.array(z.string()) });
 export type LivePost = z.infer<typeof livePostSchema>;
 
-type Listener = { onPost: (post: LivePost) => void; onResync: () => void };
+type Listener = {
+  onPost?: (post: LivePost) => void;
+  onChange?: (ids: string[]) => void;
+  onResync: () => void;
+};
 
 const STREAM_URL = "/api/live";
 const MAX_BACKOFF_MS = 30_000;
@@ -41,7 +47,15 @@ function connect() {
   next.addEventListener("post", (event) => {
     try {
       const post = livePostSchema.parse(JSON.parse(event.data));
-      for (const listener of listeners) listener.onPost(post);
+      for (const listener of listeners) listener.onPost?.(post);
+    } catch {
+      resync();
+    }
+  });
+  next.addEventListener("change", (event) => {
+    try {
+      const { ids } = liveChangeSchema.parse(JSON.parse(event.data));
+      for (const listener of listeners) listener.onChange?.(ids);
     } catch {
       resync();
     }
