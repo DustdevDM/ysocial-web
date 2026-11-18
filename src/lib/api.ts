@@ -61,7 +61,7 @@ const pollSchema = pollDraftSchema.extend({
 });
 export type PollDraft = z.infer<typeof pollDraftSchema>;
 export type Poll = z.infer<typeof pollSchema>;
-const postSchema = z.object({
+const basePostSchema = z.object({
   mentions: z
     .array(
       z.object({ id: z.string(), handle: z.string(), username: z.string() }),
@@ -97,6 +97,10 @@ const postSchema = z.object({
   // Normalized topics (#name) in the post or reply.
   topics: z.array(z.string()).default([]),
 });
+const postSchema = basePostSchema.extend({
+  // Topic pages only: the posts above a reply, root first.
+  ancestors: z.array(basePostSchema).optional(),
+});
 const topicCountSchema = z.object({ name: z.string(), count: z.number() });
 const pageSchema = z.object({
   posts: z.array(postSchema),
@@ -108,6 +112,29 @@ const postResponseSchema = z.object({
   post: postSchema,
   serverNow: z.string(),
 });
+const websiteLinkSchema = z.object({
+  href: z.string(),
+  title: z.string(),
+  iconKey: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+});
+const imagePreviewKeySchema = z.string().regex(/^[0-9a-f]{64}$/);
+const pagePreviewSchema = websiteLinkSchema.extend({
+  kind: z.literal("website").default("website"),
+  description: z.string().optional(),
+  siteName: z.string(),
+  imageKey: imagePreviewKeySchema.optional(),
+});
+const websitePreviewSchema = z.union([
+  pagePreviewSchema,
+  websiteLinkSchema.extend({ kind: z.literal("image"), imageKey: imagePreviewKeySchema }),
+]);
+const websitePreviewsSchema = z.object({
+  links: z.array(websiteLinkSchema).default([]),
+  previews: z.array(websitePreviewSchema),
+  nextOffset: z.number().int().nonnegative().optional(),
+});
+export type WebsitePreview = z.infer<typeof websitePreviewSchema>;
+export type WebsiteLink = z.infer<typeof websiteLinkSchema>;
 const threadSchema = z.object({
   post: postSchema,
   ancestors: z.array(postSchema),
@@ -623,6 +650,20 @@ export const api = {
     ),
   post: (id: string, signal?: AbortSignal) =>
     request(postPath(id), postResponseSchema, "GET", undefined, signal),
+  postPreview: (id: string, signal: AbortSignal) =>
+    sendRequest(postPath(id), postResponseSchema, "GET", undefined, signal),
+  websitePreviews: (id: string, offset: number, signal: AbortSignal) =>
+    sendRequest(
+      `${postPath(id)}/link-previews${offset ? `?offset=${offset}` : ""}`,
+      websitePreviewsSchema,
+      "GET",
+      undefined,
+      signal,
+    ),
+  websitePreviewImage: (id: string, key: string) =>
+    `${postPath(id)}/link-preview-image/${encodeURIComponent(key)}`,
+  websitePreviewIcon: (id: string, key: string) =>
+    `${postPath(id)}/link-preview-icon/${encodeURIComponent(key)}`,
   thread: (id: string, signal?: AbortSignal) =>
     request(`${postPath(id)}/thread`, threadSchema, "GET", undefined, signal),
   postEdits: (id: string, signal?: AbortSignal) =>

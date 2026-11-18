@@ -339,8 +339,10 @@ export function PostCard({
             </div>
           ) : (
             post.content && (
-              <p
-                data-selectable
+              <PostText
+                key={`${post.id}:${post.editedAt ?? ""}:${post.content}`}
+                post={post}
+                previewExternalLinks={!optimistic}
                 className={cn(
                   "mt-2 whitespace-pre-wrap break-words",
                   jumbo > 0 && jumbo <= JUMBO_MAX
@@ -349,9 +351,7 @@ export function PostCard({
                       : "text-3xl leading-snug"
                     : cn("leading-relaxed", focused ? "text-base" : "text-sm"),
                 )}
-              >
-                <PostText post={post} />
-              </p>
+              />
             )
           )}
           {post.gif && (
