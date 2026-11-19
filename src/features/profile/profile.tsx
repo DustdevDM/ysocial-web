@@ -61,9 +61,17 @@ function ProfileBadge({ label, tooltip, children }: {
   tooltip: string;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <Tooltip>
-      <TooltipTrigger type="button" aria-label={label} className="shrink-0 rounded p-1">
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger
+        type="button"
+        aria-label={label}
+        className="shrink-0 rounded p-1"
+        closeOnClick={false}
+        onClick={() => setOpen((current) => !current)}
+      >
         {children}
       </TooltipTrigger>
       <TooltipContent role="tooltip">{tooltip}</TooltipContent>
