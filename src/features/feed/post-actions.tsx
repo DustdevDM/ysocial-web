@@ -51,7 +51,7 @@ export function PostActions({ post, feed }: { post: Post; feed: FeedState }) {
         className={actionClass(post.liked && "text-red-500 hover:text-red-500")}
         label={post.liked ? "Unlike post" : "Like post"}
         aria-pressed={post.liked}
-        disabled={disabled}
+        disabled={disabled || feed.readOnly}
         onClick={() => react("like", () => feed.toggleLike(post))}
       >
         <Heart
@@ -95,7 +95,7 @@ export function PostActions({ post, feed }: { post: Post; feed: FeedState }) {
                 : "Repost or quote"
             }
             aria-haspopup="menu"
-            disabled={disabled}
+            disabled={disabled || feed.readOnly}
             // Signed-out people get the explanation toast instead of the menu.
             onClick={
               feed.canPost

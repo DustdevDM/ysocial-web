@@ -2,6 +2,7 @@ import { api } from "@/lib/api";
 import { subscribeToLive } from "@/lib/live-events";
 import {
   forgetPosts,
+  hidePosts,
   getActionRevision,
   rememberPosts,
 } from "./optimistic-actions";
@@ -66,7 +67,8 @@ async function refresh() {
           if (controller.signal.aborted) return;
           if (result.viewerId !== viewerId) continue;
           rememberPosts(result.posts, viewerId, startedAt);
-          const found = new Set(result.posts.map((post) => post.id));
+          hidePosts(result.hiddenIds, viewerId, startedAt);
+          const found = new Set([...result.hiddenIds, ...result.posts.map((post) => post.id)]);
           forgetPosts(
             batch.filter((id) => !found.has(id)),
             viewerId,

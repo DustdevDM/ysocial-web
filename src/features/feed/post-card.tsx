@@ -73,7 +73,7 @@ export function PostCard({
     return element ? watchPost(element, post.id, feed.viewerId) : undefined;
   }, [post.id, feed.viewerId]);
   const optimistic = feed.optimisticPostIds.includes(post.id);
-  const mine = post.author.id === feed.viewerId;
+  const mine = feed.canPost && post.author.id === feed.viewerId;
   const busy = feed.pending.includes(post.id);
   const emojiIndex = useEmojiIndex(editing);
   const finalContent = emojiIndex

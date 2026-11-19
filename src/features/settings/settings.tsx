@@ -42,7 +42,7 @@ export function SettingsPage({ auth }: { auth: AuthState }) {
       {session === null ? (
         <p role="status">Loading account…</p>
       ) : session.authenticated && !session.needsOnboarding ? (
-        <div key={session.user.id} className="space-y-4">
+        !session.pendingApproval && !session.ban && <div key={session.user.id} className="space-y-4">
           <ProfileSettings
             key={session.user.id}
             user={session.user}

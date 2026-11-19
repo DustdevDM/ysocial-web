@@ -186,6 +186,13 @@ const sessionSchema = z.union([
   z.object({
     authenticated: z.literal(true),
     needsOnboarding: z.literal(false),
+    pendingApproval: z.boolean().default(false),
+    ban: z.object({
+      at: z.iso.datetime(),
+      reason: z.string().nullable(),
+      by: z.string().nullable(),
+      byProfileHandle: z.string().nullable().default(null),
+    }).nullable().default(null),
     user: userSchema.extend({
       bannerUrl: z.string().nullable(),
       bannerCrop: bannerCropSchema.nullable(),
@@ -200,6 +207,10 @@ const profileSchema = z.object({
     bannerUrl: z.string().nullable(),
     bannerCrop: bannerCropSchema.nullable(),
     createdAt: z.string(),
+    banReason: z.string().nullable().default(null),
+    bannedAt: z.iso.datetime().nullable().default(null),
+    bannedBy: z.string().nullable().default(null),
+    bannedByProfileHandle: z.string().nullable().default(null),
     followerCount: z.number().int().nonnegative(),
     followingCount: z.number().int().nonnegative(),
   }),
@@ -426,6 +437,10 @@ function friendlyMessage(error: unknown) {
       return "Your session expired. Sign in to continue.";
     if (error.message === "onboarding_required")
       return "Choose your handle to continue.";
+    if (error.message === "approval_required")
+      return "Your account is awaiting approval.";
+    if (error.message === "account_banned")
+      return "Your account is banned.";
     if (error.message === "voice_too_short") return "Record at least 2 seconds.";
     if (error.message === "voice_too_long") return "Voice messages can be at most 2 minutes long.";
     if (error.message === "invalid_voice" || error.message === "voice_audio_required")
@@ -912,6 +927,7 @@ export const api = {
       z.object({
         viewerId: z.string().nullable(),
         posts: z.array(postSchema),
+        hiddenIds: z.array(z.string()).default([]),
       }),
       "GET",
       undefined,

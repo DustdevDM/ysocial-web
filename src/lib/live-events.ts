@@ -13,6 +13,7 @@ export type LivePost = z.infer<typeof livePostSchema>;
 type Listener = {
   onPost?: (post: LivePost) => void;
   onChange?: (ids: string[]) => void;
+  onAccountChange?: () => void;
   onResync: () => void;
 };
 
@@ -61,6 +62,9 @@ function connect() {
     }
   });
   next.addEventListener("resync", resync);
+  next.addEventListener("account", () => {
+    for (const listener of listeners) listener.onAccountChange?.();
+  });
   next.addEventListener("error", () => {
     gap = true;
     if (next.readyState !== EventSource.CLOSED) return;

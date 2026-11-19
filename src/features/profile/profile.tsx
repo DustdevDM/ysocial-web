@@ -18,6 +18,7 @@ import {
   UserPlus,
   UsersRound,
   RotateCcw,
+  ShieldAlert,
 } from "lucide-react";
 import { IconButton, IconLink } from "@/components/ui/icon-button";
 import { useGoBack } from "@/hooks/use-go-back";
@@ -84,6 +85,7 @@ export function ProfilePage({
     ? projectRelationship(loadedProfile, viewerId)
     : null;
   const ownProfile = loadedProfile?.profile.id === viewerId;
+  const canEditProfile = ownProfile && feed.canPost;
   const rawRepostIds = new Set(loadedProfile?.reposts.map((post) => post.id));
   const profile =
     loadedProfile && relationship
@@ -148,7 +150,7 @@ export function ProfilePage({
   const avatarUrl = profile?.profile.avatarUrl;
   const friends = profile?.isFollowing && profile.isFollowedBy;
   function toggleFollow() {
-    if (profile && viewer)
+    if (profile && viewer && feed.canPost)
       mutateFollow(profile, viewer.id, !profile.isFollowing);
   }
   async function verifyAccount(signal?: AbortSignal) {
@@ -197,7 +199,55 @@ export function ProfilePage({
         </IconLink>
         <span className="text-lg font-semibold">Profile</span>
       </header>
-      {error ? (
+      {profile?.profile.banReason ? (
+        <section aria-labelledby="banned-profile-title" className="py-4">
+          <div className="flex items-center gap-3 border-b pb-4">
+            <ShieldAlert className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div className="min-w-0">
+              <h1 id="banned-profile-title" className="text-lg font-semibold sm:text-xl">
+                This user was banned
+              </h1>
+              <p className="wrap-anywhere text-sm text-muted-foreground">
+                @{profile.profile.handle}
+              </p>
+            </div>
+          </div>
+          <dl className="space-y-4 py-4 text-sm">
+            <div className="space-y-1">
+              <dt className="font-medium text-muted-foreground">Reason</dt>
+              <dd className="wrap-anywhere leading-relaxed whitespace-pre-wrap">
+                {profile.profile.banReason}
+              </dd>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {profile.profile.bannedAt && (
+                <div className="space-y-1">
+                  <dt className="font-medium text-muted-foreground">When</dt>
+                  <dd>
+                    <time dateTime={profile.profile.bannedAt}>
+                      {new Date(profile.profile.bannedAt).toLocaleString(undefined, {
+                        dateStyle: "long",
+                        timeStyle: "short",
+                      })}
+                    </time>
+                  </dd>
+                </div>
+              )}
+              <div className="space-y-1">
+                <dt className="font-medium text-muted-foreground">Banned by</dt>
+                <dd className="wrap-anywhere">
+                  {profile.profile.bannedByProfileHandle ? (
+                    <Link className="font-medium underline-offset-4 hover:underline focus-visible:underline"
+                      to={`/@${profile.profile.bannedByProfileHandle}`}>
+                      {profile.profile.bannedBy}
+                    </Link>
+                  ) : profile.profile.bannedBy ?? "Moderation team"}
+                </dd>
+              </div>
+            </div>
+          </dl>
+        </section>
+      ) : error ? (
         <div role="alert">
           <p>{error}</p>
           <IconButton label="Retry profile" onClick={() => void load()}>
@@ -216,7 +266,7 @@ export function ProfilePage({
                 alt={`${profile.profile.displayName}'s banner`}
               />
             )}
-            {ownProfile && (
+            {canEditProfile && (
               <BannerEditor
                 bannerUrl={profile.profile.bannerUrl}
                 verifyAccount={verifyAccount}
@@ -237,7 +287,7 @@ export function ProfilePage({
                 }}
               />
             )}
-            {ownProfile ? (
+            {canEditProfile ? (
               <Dialog
                 open={pictureDialogOpen}
                 onOpenChange={setPictureDialogOpen}
@@ -350,7 +400,7 @@ export function ProfilePage({
                 @{profile.profile.handle}
               </p>
             </div>
-            {ownProfile && (
+            {canEditProfile && (
               <Dialog
                 open={editDialogOpen}
                 onOpenChange={(open) => {
@@ -397,7 +447,7 @@ export function ProfilePage({
                 </DialogContent>
               </Dialog>
             )}
-            {session &&
+            {session && !feed.readOnly &&
               profile.profile.id !== viewer?.id &&
               (viewer ? (
                 <IconButton
