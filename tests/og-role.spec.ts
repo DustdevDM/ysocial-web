@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("profiles show OG and explicitly assigned badges with tooltips", async ({ page }) => {
+test.beforeEach(async ({ page }) => {
   const [ogMember, newMember, adminMember, developer] = [
     { id: "11111111-1111-4111-8111-111111111111", handle: "og_member", displayName: "OG Member", avatarUrl: null, isOg: true },
     { id: "22222222-2222-4222-8222-222222222222", handle: "new_member", displayName: "New Member", avatarUrl: null },
@@ -50,8 +50,10 @@ test("profiles show OG and explicitly assigned badges with tooltips", async ({ p
       },
     });
   });
+});
 
-  await page.goto("/@" + ogMember.handle);
+test("profiles show OG and explicitly assigned badges with tooltips", async ({ page }) => {
+  await page.goto("/@og_member");
   await expect(page.getByRole("heading", { name: "OG Member" })).toBeVisible();
   const badge = page.getByRole("button", { name: "OG member" });
   const tooltip = page.getByRole("tooltip");
@@ -65,22 +67,46 @@ test("profiles show OG and explicitly assigned badges with tooltips", async ({ p
   await expect(badge).toBeFocused();
   await expect(tooltip).toHaveText("Joined before the big migration");
 
-  await page.goto("/@" + newMember.handle);
+  await page.goto("/@new_member");
   await expect(page.getByRole("heading", { name: "New Member" })).toBeVisible();
   await expect(badge).toHaveCount(0);
   const adminBadge = page.getByRole("button", { name: "Admin", exact: true });
   const developerBadge = page.getByRole("button", { name: "Developed this" });
   await expect(adminBadge).toHaveCount(0);
 
-  await page.goto("/@" + adminMember.handle);
+  await page.goto("/@admin_member");
   await expect(page.getByRole("heading", { name: "Admin Member" })).toBeVisible();
   await expect(adminBadge).toHaveCount(0);
   await expect(developerBadge).toHaveCount(0);
 
-  await page.goto("/@" + developer.handle);
+  await page.goto("/@dev_user");
   await expect(page.getByRole("heading", { name: "Dev User" })).toBeVisible();
   await expect(badge).toHaveCount(0);
   await expect(developerBadge.locator("span")).toHaveCSS("mask-image", /\/api\/profiles\/badge-icons\/terminal/);
   await developerBadge.hover();
   await expect(tooltip).toHaveText("Developed this");
+});
+
+test.describe("profile badges on touch screens", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 393, height: 851 } });
+
+  test("badge descriptions toggle on tap and dismiss on outside tap", async ({ page }) => {
+    await page.goto("/@og_member");
+
+    const badge = page.getByRole("button", { name: "OG member" });
+    const tooltip = page.getByRole("tooltip");
+    await expect(tooltip).toBeHidden();
+    await badge.tap();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toHaveText("Joined before the big migration");
+    await badge.tap();
+    await expect(tooltip).toBeHidden();
+
+    await page.goto("/@dev_user");
+    await page.getByRole("button", { name: "Developed this" }).tap();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toHaveText("Developed this");
+    await page.getByRole("heading", { name: "Dev User" }).tap();
+    await expect(tooltip).toBeHidden();
+  });
 });
