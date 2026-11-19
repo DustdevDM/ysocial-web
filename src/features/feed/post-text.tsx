@@ -74,21 +74,21 @@ export function PostText({
   );
   const captionId = useId();
   const [expanded, setExpanded] = useState(false);
-  const [overflows, setOverflows] = useState(false);
+  const [overflowHeight, setOverflowHeight] = useState(0);
   useLayoutEffect(() => {
     const caption = captionRef.current;
     if (!collapsible || !caption) return;
     const measure = () => {
       const lineHeight = Number.parseFloat(getComputedStyle(caption).lineHeight);
-      setOverflows(
-        caption.getBoundingClientRect().height > lineHeight * previewLines + 1,
-      );
+      const height = Math.ceil(caption.getBoundingClientRect().height);
+      setOverflowHeight(height > lineHeight * previewLines + 1 ? height : 0);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(caption);
     return () => observer.disconnect();
   }, [captionRef, collapsible]);
+  const overflows = collapsible && overflowHeight > 0;
   const websites = details?.websites;
   const websiteEmbed =
     embed?.kind === "external"
@@ -283,15 +283,24 @@ export function PostText({
   return (
     <>
       <div
-        className={className}
+        className={cn(
+          className,
+          overflows &&
+            "overflow-clip motion-safe:transition-[max-height,mask-size] motion-safe:duration-300 motion-safe:ease-out",
+        )}
         style={
-          collapsible && !expanded
-            ? { maxHeight: `${previewLines}lh`, overflow: "clip" }
+          overflows
+            ? {
+                maxHeight: expanded ? overflowHeight : `${previewLines}lh`,
+                maskImage: "linear-gradient(black calc(100% - 1lh), transparent)",
+                // Move the fade below the text as the preview expands.
+                maskSize: expanded ? "100% calc(100% + 1lh)" : "100% 100%",
+                maskRepeat: "no-repeat",
+              }
             : undefined
         }
         onFocus={(event) => {
           if (
-            collapsible &&
             overflows &&
             !expanded &&
             event.target.getBoundingClientRect().bottom >
@@ -311,7 +320,7 @@ export function PostText({
           {renderRich()}
         </p>
       </div>
-      {collapsible && overflows && (
+      {overflows && (
         <button
           type="button"
           aria-controls={captionId}
