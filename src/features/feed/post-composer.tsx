@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ArrowUp, ChartNoAxesColumn, Plus, X } from "lucide-react";
+import { ComingSoonDialog } from "@/components/coming-soon-dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -156,6 +157,7 @@ function AuthenticatedPostComposer({
 } & QuoteOptions) {
   const [published, setPublished] = useState(false);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [soonOpen, setSoonOpen] = useState(false);
   const [gif, setGif] = useState<GifSearchItem | null>(null);
   const [poll, setPoll] = useState<PollDraft | null>(null);
   const [voice, setVoice] = useState<VoiceDraft>();
@@ -247,6 +249,7 @@ function AuthenticatedPostComposer({
 
   const textClass = "py-1.5 text-sm leading-6 md:text-base";
   return (
+    <>
     <Dialog open={gifPickerOpen} onOpenChange={setGifPickerOpen}>
       {/* Equal 8px padding above, below and right of the buttons (36px). */}
       <div className="relative mx-auto w-full max-w-xl">
@@ -282,7 +285,7 @@ function AuthenticatedPostComposer({
             </div>
           )}
           <div
-            className="relative min-w-0 flex-1 transition-[height] duration-200 ease-out"
+            className="relative min-w-0 flex-1 basis-[calc(100%-0.5rem)] transition-[height] duration-200 ease-out"
             style={{
               height: height ? Math.min(height, MAX_HEIGHT) : undefined,
             }}
@@ -381,8 +384,15 @@ function AuthenticatedPostComposer({
             onChange={setVoice}
             onBusyChange={setVoiceBusy}
             renderToolbar={(recordButton) => (
-              <div className="ml-auto flex shrink-0 items-center gap-1">
-                <LimitRing length={length} />
+              <div className="-ml-2 flex shrink-0 basis-[calc(100%+0.5rem)] items-center gap-0.5">
+                <IconButton
+                  label="Upload"
+                  type="button"
+                  className="rounded-full text-muted-foreground"
+                  onClick={() => setSoonOpen(true)}
+                >
+                  <Plus aria-hidden="true" />
+                </IconButton>
                 {!poll && (
                   <IconButton
                     label="Add poll"
@@ -413,15 +423,18 @@ function AuthenticatedPostComposer({
                 >
                   <span className="text-[10px] font-semibold">GIF</span>
                 </DialogTrigger>
-                <IconButton
-                  label={quote ? "Publish quote" : "Publish post"}
-                  type="submit"
-                  variant="default"
-                  className="rounded-full"
-                  disabled={!valid}
-                >
-                  <ArrowUp />
-                </IconButton>
+                <div className="ml-auto flex items-center gap-1">
+                  <LimitRing length={length} />
+                  <IconButton
+                    label={quote ? "Publish quote" : "Publish post"}
+                    type="submit"
+                    variant="default"
+                    className="rounded-full"
+                    disabled={!valid}
+                  >
+                    <ArrowUp />
+                  </IconButton>
+                </div>
               </div>
             )}
           />
@@ -459,6 +472,8 @@ function AuthenticatedPostComposer({
         />
       )}
     </Dialog>
+    <ComingSoonDialog open={soonOpen} onOpenChange={setSoonOpen} />
+    </>
   );
 }
 
