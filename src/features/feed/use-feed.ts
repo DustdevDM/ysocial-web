@@ -166,18 +166,33 @@ export function useFeed(
     enabled: autoLoad && parentId === undefined,
     scope: `${viewerId ?? "anonymous"}|${topic ?? ""}`,
     relevant: (live) =>
-      (topic
+      ((topic
         ? live.topics.includes(topic)
         : live.parentId === null || live.reposted) &&
       !localIds.has(live.id) &&
-      !feedPosts.some((post) => post.id === live.id),
+      !feedPosts.some((post) => post.id === live.id)) ||
+      // The author's first reply lands under a post that is already listed.
+      (live.parentId !== null &&
+        feedPosts.some(
+          (post) => post.id === live.parentId && !post.selfReply,
+        )),
     refresh: async (signal) => {
       const startedAt = getActionRevision();
       const page = await api.posts(undefined, signal, topic);
       if (signal.aborted) return;
       const known = new Set([...localIds, ...feedPosts.map((post) => post.id)]);
       const fresh = page.posts.filter((post) => !known.has(post.id));
-      if (!fresh.length) return;
+      const withReply = new Map(
+        page.posts.flatMap((post) =>
+          post.selfReply && !localIds.has(post.id)
+            ? [[post.id, post.selfReply] as const]
+            : [],
+        ),
+      );
+      const gained = feedPosts.filter(
+        (post) => !post.selfReply && withReply.has(post.id),
+      );
+      if (!fresh.length && !gained.length) return;
       const contiguous =
         known.size === 0 ||
         !page.nextCursor ||
@@ -186,6 +201,15 @@ export function useFeed(
       await applyLive(
         signal,
         (atTop) => {
+          if (gained.length)
+            setFeedPosts((current) =>
+              current.map((post) =>
+                !post.selfReply && withReply.has(post.id)
+                  ? { ...post, selfReply: withReply.get(post.id) }
+                  : post,
+              ),
+            );
+          if (!fresh.length) return;
           if (contiguous) {
             const freshIds = new Set(fresh.map((post) => post.id));
             setFeedPosts((current) => [

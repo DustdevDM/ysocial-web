@@ -144,7 +144,13 @@ export function rememberPollResults(
   if (changed) notify();
 }
 function basePost(post: Post, viewerId: string | null) {
-  return posts.get(keyFor(viewerId, post.id))?.value ?? post;
+  const cached = posts.get(keyFor(viewerId, post.id))?.value;
+  if (!cached) return post;
+  // Only list responses carry the author's first reply; a copy cached from
+  // elsewhere (a thread, a refresh) must not drop the one the list already has.
+  return post.selfReply && !cached.selfReply
+    ? { ...cached, selfReply: post.selfReply }
+    : cached;
 }
 function applyPost(post: Post, command: PostCommand): Post {
   switch (command.kind) {

@@ -106,7 +106,7 @@ export function NavigationSidebar({
             </Tooltip>
           ))}
         </nav>
-        {newPost && (
+        {newPost && newPost.kind !== "reply" && (
           <Button
             type="button"
             onClick={newPost.open}
