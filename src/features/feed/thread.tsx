@@ -22,7 +22,7 @@ import { NewPostDialog } from "./feed-floaters";
 import { PostComposer } from "./post-composer";
 import { PostActivity } from "./post-activity";
 import { useFeed, type FeedState } from "./use-feed";
-import { getActionRevision, rememberPosts } from "./optimistic-actions";
+import { getActionRevision, isPostHidden, rememberPosts } from "./optimistic-actions";
 import { acknowledgePosts } from "./post-outbox";
 import { applyLive } from "./live-insert";
 import { useLiveUpdates } from "./use-live-updates";
@@ -250,7 +250,7 @@ export function Thread({
       </header>
       {wasDeleted ? (
         <p role="status" className="py-6 text-sm text-muted-foreground">
-          Post deleted.
+          {isPostHidden(id, viewerId) ? "Post unavailable." : "Post deleted."}
         </p>
       ) : error && !data ? (
         <div role="alert">
@@ -300,7 +300,7 @@ export function Thread({
           </h2>
           {tree.length === 0 ? (
             <p className="py-4 text-sm text-muted-foreground">
-              No replies yet. Start the conversation.
+              {feed.readOnly ? "No replies yet." : "No replies yet. Start the conversation."}
             </p>
           ) : (
             <div>
@@ -323,19 +323,21 @@ export function Thread({
               This conversation is long. Open a reply to see more of it.
             </p>
           )}
-          <NewPostDialog
-            feed={feed}
-            kind="reply"
-            show={!feed.sessionLoading}
-            anchor={focusedRef}
-          />
-          <div className="sticky bottom-0 z-20 mt-4 hidden bg-linear-to-t from-background from-70% to-transparent pt-4 pb-1 md:block">
+          {!feed.readOnly && (
+            <NewPostDialog
+              feed={feed}
+              kind="reply"
+              show={!feed.sessionLoading}
+              anchor={focusedRef}
+            />
+          )}
+          {!feed.readOnly && <div className="sticky bottom-0 z-20 mt-4 hidden bg-linear-to-t from-background from-70% to-transparent pt-4 pb-1 md:block">
             <PostComposer
               feed={feed}
               placeholder="Write a reply…"
               dropUp
             />
-          </div>
+          </div>}
         </>
       ) : (
         <>

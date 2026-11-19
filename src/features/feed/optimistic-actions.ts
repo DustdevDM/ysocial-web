@@ -31,6 +31,7 @@ const relationships = new Map<string, Entry<Relationship>>();
 const postOperations = new Map<string, PostOperation[]>();
 const followOperations = new Map<string, FollowOperation[]>();
 const deleted = new Set<string>();
+const hidden = new Map<string, number>();
 const replyOperations = new Map<string, Set<string>>();
 const jobs = new Map<string, (() => Promise<void>)[]>();
 const keyFor = (viewerId: string | null, id: string) =>
@@ -101,11 +102,13 @@ export function rememberPosts(
     const key = keyFor(viewerId, post.id);
     if (
       (posts.get(key)?.revision ?? -1) > startedAt ||
+      (hidden.get(key) ?? -1) > startedAt ||
       deleted.has(key) ||
       postOperations.get(key)?.length ||
       replyOperations.get(key)?.size
     )
       continue;
+    hidden.delete(key);
     posts.set(key, { value: post, revision });
     changed = true;
   }
@@ -117,10 +120,26 @@ export function forgetPosts(ids: string[], viewerId: string | null) {
   for (const id of ids) {
     const key = keyFor(viewerId, id);
     if (deleted.has(key)) continue;
+    hidden.delete(key);
     deleted.add(key);
     changed = true;
   }
   if (changed) notify();
+}
+
+export function hidePosts(ids: string[], viewerId: string | null, startedAt: number) {
+  let changed = false;
+  for (const id of ids) {
+    const key = keyFor(viewerId, id);
+    if (deleted.has(key) || hidden.has(key) || (posts.get(key)?.revision ?? -1) > startedAt) continue;
+    hidden.set(key, revision + 1);
+    changed = true;
+  }
+  if (changed) notify();
+}
+
+export function isPostHidden(id: string, viewerId: string | null) {
+  return hidden.has(keyFor(viewerId, id));
 }
 
 export function rememberPollResults(
@@ -212,6 +231,7 @@ export function projectPost(post: Post, viewerId: string | null): Post | null {
   const base = basePost(post, viewerId);
   if (isDeleted(base, viewerId)) return null;
   const key = keyFor(viewerId, post.id);
+  if (hidden.has(key)) return null;
   let result = (postOperations.get(key) ?? []).reduce(
     (value, op) => applyPost(value, op.command),
     base,

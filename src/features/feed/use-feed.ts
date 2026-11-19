@@ -100,7 +100,9 @@ export function useFeed(
     const timer = window.setTimeout(() => setEnteringIds(new Set()), 700);
     return () => window.clearTimeout(timer);
   }, [enteringIds]);
-  const canPost = !!session?.authenticated && !session.needsOnboarding;
+  const onboarded = !!session?.authenticated && !session.needsOnboarding;
+  const readOnly = onboarded && (session.pendingApproval || !!session.ban);
+  const canPost = onboarded && !readOnly;
   const load = useCallback(
     async (cursor?: string, signal?: AbortSignal, revalidate = false) => {
       const startedAt = getActionRevision();
@@ -181,7 +183,11 @@ export function useFeed(
       const page = await api.posts(undefined, signal, topic);
       if (signal.aborted) return;
       const known = new Set([...localIds, ...feedPosts.map((post) => post.id)]);
-      const fresh = page.posts.filter((post) => !known.has(post.id));
+      // A deletion can backfill the end of the first page with older posts.
+      // Live insertion only adds the entries ahead of the existing feed.
+      const firstKnown = page.posts.findIndex((post) => known.has(post.id));
+      const fresh =
+        firstKnown === -1 ? page.posts : page.posts.slice(0, firstKnown);
       const withReply = new Map(
         page.posts.flatMap((post) =>
           post.selfReply && !localIds.has(post.id)
@@ -194,9 +200,7 @@ export function useFeed(
       );
       if (!fresh.length && !gained.length) return;
       const contiguous =
-        known.size === 0 ||
-        !page.nextCursor ||
-        page.posts.some((post) => known.has(post.id));
+        known.size === 0 || !page.nextCursor || firstKnown !== -1;
       rememberPosts(page.posts, viewerId, startedAt);
       await applyLive(
         signal,
@@ -263,6 +267,8 @@ export function useFeed(
     if (
       !session?.authenticated ||
       session.needsOnboarding ||
+      session.pendingApproval ||
+      session.ban ||
       (!content && !gif && !poll && !voice) ||
       Array.from(content).length > 2000
     )
@@ -292,6 +298,8 @@ export function useFeed(
     if (
       !session?.authenticated ||
       session.needsOnboarding ||
+      session.pendingApproval ||
+      session.ban ||
       (!content && !gif && !poll && !voice) ||
       Array.from(content).length > 2000
     )
@@ -376,6 +384,7 @@ export function useFeed(
     authenticated: !!session?.authenticated,
     error,
     canPost,
+    readOnly,
     pending: optimisticPostIds,
     sharePost,
     unread,
@@ -396,12 +405,12 @@ export function useFeed(
       return load();
     },
     toggleLike: (post: Post) =>
-      viewerId
+      canPost && viewerId
         ? mutatePost(post, viewerId, { kind: "like", value: !post.liked })
         : false,
     /** Repost with an audience, or undo the repost with `null`. */
     setRepost: (post: Post, audience: RepostAudience | null) =>
-      viewerId
+      canPost && viewerId
         ? mutatePost(post, viewerId, {
             kind: "repost",
             value: audience !== null,
@@ -410,12 +419,12 @@ export function useFeed(
         : false,
     isVoting: (post: Post) => !!viewerId && isVoting(post.id, viewerId),
     vote: (post: Post, optionIndex: number) =>
-      viewerId
+      canPost && viewerId
         ? mutatePost(post, viewerId, { kind: "vote", optionIndex })
         : false,
     editPost: (post: Post, content: string) => {
       const trimmed = content.trim();
-      return viewerId &&
+      return canPost && viewerId &&
         (trimmed || post.gif || post.poll || post.voice) &&
         Array.from(trimmed).length <= 2000
         ? mutatePost(post, viewerId, {
@@ -426,7 +435,7 @@ export function useFeed(
         : false;
     },
     deletePost: (post: Post) =>
-      viewerId ? mutatePost(post, viewerId, { kind: "delete" }) : false,
+      canPost && viewerId ? mutatePost(post, viewerId, { kind: "delete" }) : false,
     viewerId,
   };
 }

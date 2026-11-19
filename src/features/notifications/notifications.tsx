@@ -63,7 +63,7 @@ const kinds = {
 };
 
 function NotificationsContent({ onNavigate }: { onNavigate?: () => void }) {
-  const { items, loading, nextCursor, error, refresh, markRead, signedIn } =
+  const { items, loading, nextCursor, error, refresh, markRead, signedIn, canWrite } =
     useNotifications();
   const navigate = useNavigate();
   const visible = items;
@@ -217,16 +217,16 @@ function NotificationsContent({ onNavigate }: { onNavigate?: () => void }) {
           </Button>
         )}
       </div>
-      <div className="shrink-0 border-t p-3">
+      {canWrite && <div className="shrink-0 border-t p-3">
         <PushSettings />
-      </div>
+      </div>}
     </>
   );
 }
 
 function MarkAllRead() {
-  const { busy, unreadCount, items, markRead, signedIn } = useNotifications();
-  if (!signedIn) return null;
+  const { busy, unreadCount, items, markRead, canWrite } = useNotifications();
+  if (!canWrite) return null;
   return (
     <Button
       variant="ghost"
