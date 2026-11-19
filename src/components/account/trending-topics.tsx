@@ -52,6 +52,47 @@ function useTrendingTopics() {
   return { topics, failed };
 }
 
+export function TrendingTopicsStrip() {
+  const { topics } = useTrendingTopics();
+  if (!topics?.length) return null;
+  return (
+    <section
+      aria-label="Trending topics"
+      className="mx-auto mb-4 w-full max-w-xl lg:hidden"
+    >
+      <ul className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+        <li className="shrink-0 text-xs font-semibold text-muted-foreground">
+          Trending
+        </li>
+        {topics.map((topic) => (
+          <li key={topic.name} className="shrink-0">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    to={topicPath(topic.name)}
+                    aria-label={`#${topic.name}, ${topic.count.toLocaleString()} ${topic.count === 1 ? "post" : "posts"} in the last 24 hours`}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                }
+              >
+                #{topic.name}
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {topic.count.toLocaleString()}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {topic.count.toLocaleString()}{" "}
+                {topic.count === 1 ? "post" : "posts"} in the last 24 hours
+              </TooltipContent>
+            </Tooltip>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function TrendingTopics() {
   const { topics, failed } = useTrendingTopics();
   return (

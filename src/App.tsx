@@ -28,11 +28,14 @@ import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { IconLink } from "@/components/ui/icon-button";
 import { Feed } from "@/features/feed/feed";
+import { TrendingTopicsStrip } from "@/components/account/trending-topics";
 import { Account, ApprovalBanner } from "@/features/auth/account";
 import { useAuth, type AuthState } from "@/features/auth/use-auth";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Thread } from "@/features/feed/thread";
 import { TopicPage } from "@/features/topics/topic-page";
+import { SearchPage } from "@/features/search/search-page";
+import { useSearchShortcut } from "@/features/search/use-search-shortcut";
 import { isTopicName, normalizeTopic } from "@/lib/topics";
 import { ProfilePage } from "@/features/profile/profile";
 import type { Session } from "@/lib/api";
@@ -62,6 +65,7 @@ export function App() {
 
 function AppShell() {
   const auth = useAuth();
+  useSearchShortcut();
   const awaitingApproval = auth.session?.authenticated && !auth.session.needsOnboarding
     && auth.session.pendingApproval && !auth.session.ban;
   // State, not a ref: the section is recreated when the signed-in session
@@ -210,7 +214,10 @@ function AppShell() {
                 path="/messages"
                 element={<ComingSoon title="Messages" />}
               />
-              <Route path="/search" element={<ComingSoon title="Search" />} />
+              <Route
+                path="/search"
+                element={<SearchPage session={auth.session} />}
+              />
               <Route path="/report" element={<ComingSoon title="Report" />} />
               <Route
                 path="/bug"
@@ -252,7 +259,13 @@ function HomeFeed({ session }: { session: Session | null }) {
   usePageTitle("Feed");
   const feed = useFeed(session);
   const { key: navigationKey } = useLocation();
-  return <Feed feed={feed} refreshKey={navigationKey} />;
+  return (
+    <Feed
+      feed={feed}
+      refreshKey={navigationKey}
+      header={<TrendingTopicsStrip />}
+    />
+  );
 }
 function MyProfileRoute({ auth }: { auth: AuthState }) {
   usePageTitle("Profile");

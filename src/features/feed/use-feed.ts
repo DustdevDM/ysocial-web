@@ -71,12 +71,13 @@ export function useFeed(
   onPublished?: () => void,
   /** Only posts and replies with this normalized topic. */
   topic?: string,
+  search?: string,
 ) {
   const viewerId =
     session?.authenticated && !session.needsOnboarding ? session.user.id : null;
   const cacheKey =
     parentId === undefined
-      ? `${viewerId ?? "anonymous"}${topic ? `|topic:${topic}` : ""}`
+      ? `${viewerId ?? "anonymous"}${topic ? `|topic:${topic}` : ""}${search ? `|search:${search}` : ""}`
       : null;
   const [cached] = useState(() =>
     cacheKey === null ? undefined : feedCache.get(cacheKey),
@@ -100,6 +101,7 @@ export function useFeed(
   const localPosts = useSyncExternalStore(subscribeToLocalPosts, getLocalPosts);
   const visibleLocalPosts = localPosts.filter(
     (entry) =>
+      !search &&
       entry.post.author.id === viewerId &&
       (topic
         ? entry.post.topics.includes(topic)
@@ -126,7 +128,7 @@ export function useFeed(
       try {
         const page = parentId
           ? await api.replies(parentId, cursor, signal)
-          : await api.posts(cursor, signal, topic);
+          : await api.posts(cursor, signal, topic, search);
         if (signal?.aborted) return;
         rememberPosts(page.posts, viewerId, startedAt);
         // The page is authoritative for the posts it holds, including their order:
@@ -167,7 +169,7 @@ export function useFeed(
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [parentId, viewerId, topic],
+    [parentId, viewerId, topic, search],
   );
   useEffect(() => {
     if (cacheKey === null) return;
@@ -182,7 +184,7 @@ export function useFeed(
     return () => controller.abort();
   }, [load, session, autoLoad, cached]);
   useLiveUpdates({
-    enabled: autoLoad && parentId === undefined,
+    enabled: autoLoad && parentId === undefined && !search,
     scope: `${viewerId ?? "anonymous"}|${topic ?? ""}`,
     relevant: (live) =>
       ((topic
@@ -371,7 +373,7 @@ export function useFeed(
       post: Post,
       base: RepostContext | undefined = repostedBy[post.id],
       // Only the home feed lists reposts; topic and reply lists never do.
-      synthesize = !topic && parentId === undefined,
+      synthesize = !topic && !search && parentId === undefined,
     ) =>
       projectRepostContext(
         post,
