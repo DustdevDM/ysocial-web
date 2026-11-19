@@ -5,7 +5,7 @@ type Availability = "available" | "taken" | "checking" | "invalid" | "error";
 
 export function useHandleAvailability(
   handle: string,
-  currentHandle: string,
+  currentHandle?: string,
 ): Availability {
   const valid = /^[a-z0-9_]{3,32}$/.test(handle);
   const [result, setResult] = useState<{

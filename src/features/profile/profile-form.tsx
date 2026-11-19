@@ -12,6 +12,8 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { useHandleAvailability } from "./use-handle-availability";
+import { PronounsField } from "./pronouns-field";
+import { invalidateProfileCard } from "./profile-card-cache";
 
 type ProfileFields = Awaited<ReturnType<typeof api.updateProfile>>;
 const bioLimit = 160;
@@ -39,6 +41,7 @@ export function ProfileForm({
     handle: profile.handle,
     displayName: profile.displayName,
     bio: profile.bio,
+    pronouns: profile.pronouns,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -86,6 +89,8 @@ export function ProfileForm({
       )
         throw new ApiError(403, "retry_account_changed");
       const updated = await api.updateProfile(changes);
+      invalidateProfileCard(baseline.handle);
+      if (updated.handle !== baseline.handle) invalidateProfileCard(updated.handle);
       updateAuthor(userId, {
         handle: updated.handle,
         displayName: updated.displayName,
@@ -158,6 +163,12 @@ export function ProfileForm({
               {handleStatus}
             </p>
           )}
+        </div>
+        <div className={rowClass}>
+          <PronounsField
+            value={draft.pronouns}
+            onChange={(value) => change("pronouns", value)}
+          />
         </div>
         <div className="space-y-2">
           <label htmlFor={`${id}-bio`} className="text-sm font-medium">

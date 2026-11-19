@@ -158,6 +158,11 @@ function UserCardBody({ card }: { card: ProfileCard }) {
             )}
           </div>
         </div>
+        {profile.pronouns && (
+          <p className="mt-1 wrap-anywhere text-sm text-muted-foreground">
+            <bdi>{profile.pronouns}</bdi>
+          </p>
+        )}
         {bio && (
           <p className="mt-2.5 line-clamp-3 text-sm leading-snug break-words whitespace-pre-line">
             {bio}
