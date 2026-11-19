@@ -128,6 +128,10 @@ const postSchema = basePostSchema.extend({
   selfReply: basePostSchema.nullable().optional(),
 });
 const topicCountSchema = z.object({ name: z.string(), count: z.number() });
+const searchUserSchema = userSchema.extend({
+  bio: z.string(),
+  followerCount: z.number(),
+});
 const pageSchema = z.object({
   posts: z.array(postSchema),
   repostedBy: repostedBySchema,
@@ -244,6 +248,7 @@ export type GifSearchItem = Awaited<
   ReturnType<typeof api.searchGifs>
 >["items"][number];
 export type TopicCount = z.infer<typeof topicCountSchema>;
+export type SearchUser = z.infer<typeof searchUserSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type Profile = z.infer<typeof profileSchema>;
 const notificationSchema = z.object({
@@ -484,6 +489,8 @@ function friendlyMessage(error: unknown) {
     if (error.message === "invalid_poll_option")
       return "Choose an option from this poll.";
     if (error.message === "invalid_topic") return "This isn't a valid topic.";
+    if (error.message === "invalid_search")
+      return "This search isn't valid. Try something shorter.";
     if (error.message === "retry_account_changed")
       return "Sign in to the original account before retrying this action.";
     if (error.message === "post_id_conflict")
@@ -751,9 +758,17 @@ export const api = {
       signal,
     ),
   logout: () => request("/auth/logout", z.undefined(), "POST"),
-  posts: (cursor?: string, signal?: AbortSignal, topic?: string) => {
+  posts: (
+    cursor?: string,
+    signal?: AbortSignal,
+    topic?: string,
+    search?: string,
+  ) => {
     const query = new URLSearchParams();
     if (topic) query.set("topic", topic);
+    if (search)
+      for (const [key, value] of new URLSearchParams(search))
+        query.set(key, value);
     if (cursor) query.set("cursor", cursor);
     return request(
       `/api/posts${query.size ? `?${query}` : ""}`,
@@ -763,6 +778,41 @@ export const api = {
       signal,
     );
   },
+  search: (query: string, signal?: AbortSignal) =>
+    request(
+      `/api/search?q=${encodeURIComponent(query)}`,
+      z.object({
+        users: z.array(searchUserSchema),
+        topics: z.array(topicCountSchema),
+        moreUsers: z.boolean(),
+        moreTopics: z.boolean(),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
+  searchUsers: (query: string, cursor?: string, signal?: AbortSignal) =>
+    request(
+      `/api/search?type=users&q=${encodeURIComponent(query)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      z.object({
+        users: z.array(searchUserSchema),
+        nextCursor: z.string().nullable(),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
+  searchTopics: (query: string, cursor?: string, signal?: AbortSignal) =>
+    request(
+      `/api/search?type=topics&q=${encodeURIComponent(query)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+      z.object({
+        topics: z.array(topicCountSchema),
+        nextCursor: z.string().nullable(),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
   /** The most used topics of the last 24 hours. */
   trendingTopics: (signal?: AbortSignal) =>
     request(
