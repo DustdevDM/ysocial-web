@@ -6,6 +6,7 @@ import { Check, LoaderCircle, Pencil, Trash2, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { IconButton } from "@/components/ui/icon-button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { MentionLink } from "./mention-text";
 import { MentionTextarea } from "./mention-textarea";
 import { PostActions } from "./post-actions";
 import { PostText } from "./post-text";
@@ -287,12 +288,9 @@ export function PostCard({
           {replyContext && post.replyTo && (
             <p className="mt-0.5 text-xs text-muted-foreground">
               Replying to{" "}
-              <Link
-                to={`/@${post.replyTo.handle}`}
-                className="text-blue-600 hover:underline dark:text-blue-400"
-              >
+              <MentionLink handle={post.replyTo.handle}>
                 @{post.replyTo.handle}
-              </Link>
+              </MentionLink>
             </p>
           )}
           {editing ? (

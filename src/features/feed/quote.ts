@@ -13,6 +13,7 @@ export function quoteOf(post: Post): PostQuote {
       parentId: post.parentId,
       pollTitle: post.poll?.title ?? null,
       isQuote: post.quote !== null,
+      mentions: post.mentions,
       author: post.author,
     },
   };

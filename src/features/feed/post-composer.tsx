@@ -24,7 +24,6 @@ import {
 import { QuotedPostCard } from "./quoted-post";
 import { quoteOf } from "./quote";
 import { VoiceRecorder } from "./voice-recorder";
-import { splitWrittenTopics } from "@/lib/topics";
 import { renderShortcodes } from "@/lib/emoji";
 import { useEmojiIndex } from "@/lib/use-emoji-index";
 import {
@@ -167,7 +166,6 @@ function AuthenticatedPostComposer({
   const [height, setHeight] = useState<number>();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const mirror = useRef<HTMLDivElement>(null);
-  const highlight = useRef<HTMLDivElement>(null);
   const scrolls = (height ?? 0) > MAX_HEIGHT;
   const helpId = useId();
   const suggestionsId = useId();
@@ -297,30 +295,6 @@ function AuthenticatedPostComposer({
               {draft || " "}
               {"\u200b"}
             </div>
-            {topics && (
-              // Draws the text under the see-through textarea, so written
-              // #topics can be blue. Same box, font and scroll as the field.
-              <div
-                ref={highlight}
-                aria-hidden="true"
-                style={{ overflowY: scrolls ? "auto" : "hidden" }}
-                className={`pointer-events-none absolute inset-0 break-words whitespace-pre-wrap ${textClass}`}
-              >
-                {splitWrittenTopics(draft).map((part, index) =>
-                  part.topic ? (
-                    <span
-                      key={index}
-                      className="text-blue-600 dark:text-blue-400"
-                    >
-                      {part.text}
-                    </span>
-                  ) : (
-                    part.text
-                  ),
-                )}
-                {"\u200b"}
-              </div>
-            )}
             <MentionTextarea
               ref={textarea}
               aria-label={placeholder.replace("…", "")}
@@ -335,6 +309,7 @@ function AuthenticatedPostComposer({
               rows={1}
               value={draft}
               onValueChange={setDraft}
+              topics={topics}
               wrapperClassName="relative h-full"
               disabled={!feed.canPost}
               onChange={(event) => {
@@ -345,10 +320,6 @@ function AuthenticatedPostComposer({
               onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              onScroll={(event) => {
-                if (highlight.current)
-                  highlight.current.scrollTop = event.currentTarget.scrollTop;
-              }}
               onKeyDown={(event) => {
                 if (suggestions.open && !event.nativeEvent.isComposing) {
                   const chosen =
@@ -389,7 +360,7 @@ function AuthenticatedPostComposer({
                 }
               }}
               style={{ overflowY: scrolls ? "auto" : "hidden" }}
-              className={`${topics ? "text-transparent caret-foreground " : ""}absolute inset-0 h-full min-h-0 resize-none field-sizing-fixed rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 dark:bg-transparent dark:disabled:bg-transparent ${textClass}`}
+              className={`absolute inset-0 h-full min-h-0 resize-none field-sizing-fixed rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 dark:bg-transparent dark:disabled:bg-transparent ${textClass}`}
             />
           </div>
           {poll && (

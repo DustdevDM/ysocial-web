@@ -34,6 +34,11 @@ const quotedPostSchema = z.object({
   parentId: z.string().nullable(),
   pollTitle: z.string().nullable(),
   isQuote: z.boolean(),
+  mentions: z
+    .array(
+      z.object({ id: z.string(), handle: z.string(), username: z.string() }),
+    )
+    .default([]),
   author: userSchema,
 });
 const quoteSchema = z.discriminatedUnion("state", [
@@ -205,6 +210,22 @@ const profileSchema = z.object({
   replies: z.array(z.object({ post: postSchema, thread: z.array(postSchema) })),
   serverNow: z.string(),
 });
+const profileCardSchema = z.object({
+  profile: userSchema.extend({
+    bio: z.string(),
+    bannerUrl: z.string().nullable(),
+    bannerCrop: bannerCropSchema.nullable(),
+    createdAt: z.string(),
+    followerCount: z.number().int().nonnegative(),
+    followingCount: z.number().int().nonnegative(),
+    postCount: z.number().int().nonnegative(),
+  }),
+  isFollowing: z.boolean(),
+  isFollowedBy: z.boolean(),
+  isSelf: z.boolean(),
+  signedIn: z.boolean(),
+});
+export type ProfileCard = z.infer<typeof profileCardSchema>;
 export type Post = z.infer<typeof postSchema>;
 export type GifSearchItem = Awaited<
   ReturnType<typeof api.searchGifs>
@@ -938,6 +959,14 @@ export const api = {
         followerCount: z.number().int().nonnegative(),
       }),
       following ? "PUT" : "DELETE",
+    ),
+  profileCard: (handle: string, signal?: AbortSignal) =>
+    request(
+      `/api/profiles/${encodeURIComponent(handle)}/card`,
+      profileCardSchema,
+      "GET",
+      undefined,
+      signal,
     ),
   profile: (handle: string, signal?: AbortSignal) =>
     request(
