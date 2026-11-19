@@ -22,7 +22,6 @@
   "menuColor": "default",
   "menuAccent": "subtle",
   "registries": {
-    "@creative-tim": "https://www.creative-tim.com/ui/r/{name}.json",
-    "@magicui": "https://magicui.design/r/{name}"
+    "@creative-tim": "https://www.creative-tim.com/ui/r/{name}.json"
   }
 }
