@@ -65,6 +65,32 @@ type BannerSelection =
   | { kind: "upload"; file: Blob; id: number }
   | { kind: "gif"; url: string; token: string };
 
+function getBannerCrop(
+  cropper: CropperApi,
+  kind: BannerSelection["kind"],
+): BannerCrop | null {
+  if (kind === "upload") {
+    const image = cropper.getCropState()?.image;
+    const rect = cropper.getPixelCrop()?.pixelRect;
+    if (!image || !rect) return null;
+    // Store the pixel-aligned selection in the API's normalized format.
+    return {
+      x: rect.left / image.width,
+      y: rect.top / image.height,
+      width: rect.width / image.width,
+      height: rect.height / image.height,
+    };
+  }
+
+  const { center, size } = cropper.getValue();
+  return {
+    x: Math.max(0, center.x - size.width / 2),
+    y: Math.max(0, center.y - size.height / 2),
+    width: Math.min(1, size.width),
+    height: Math.min(1, size.height),
+  };
+}
+
 function BannerPicker({
   current,
   onSaved,
@@ -189,16 +215,11 @@ function BannerPicker({
     setError("");
     const controller = new AbortController();
     request.current = controller;
-    const value = cropper.current?.getValue();
-    const crop = value
-      ? {
-          x: Math.max(0, value.center.x - value.size.width / 2),
-          y: Math.max(0, value.center.y - value.size.height / 2),
-          width: Math.min(1, value.size.width),
-          height: Math.min(1, value.size.height),
-        }
-      : null;
     try {
+      const crop =
+        !remove && selection && cropper.current
+          ? getBannerCrop(cropper.current, selection.kind)
+          : null;
       if (!remove && !crop) throw new Error("Crop is not ready");
       await retryRequest(
         async () => {
