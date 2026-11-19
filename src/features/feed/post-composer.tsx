@@ -47,12 +47,15 @@ export function PostComposer({
   feed,
   placeholder = "What's on your mind?",
   topics = true,
+  dropUp = false,
   ...quoting
 }: {
   feed: FeedState;
   placeholder?: string;
   /** Offer #topic completion. */
   topics?: boolean;
+  /** Open suggestion lists above the field (for composers pinned to the bottom). */
+  dropUp?: boolean;
 } & QuoteOptions) {
   if (!feed.sessionLoading && !feed.authenticated) {
     return (
@@ -79,6 +82,7 @@ export function PostComposer({
       feed={feed}
       placeholder={placeholder}
       topics={topics}
+      dropUp={dropUp}
       {...quoting}
     />
   );
@@ -146,6 +150,7 @@ function AuthenticatedPostComposer({
   feed,
   placeholder,
   topics,
+  dropUp,
   quote,
   autoFocus,
   onSubmitted,
@@ -154,6 +159,7 @@ function AuthenticatedPostComposer({
   feed: FeedState;
   placeholder: string;
   topics: boolean;
+  dropUp: boolean;
 } & QuoteOptions) {
   const [published, setPublished] = useState(false);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
@@ -313,6 +319,7 @@ function AuthenticatedPostComposer({
               value={draft}
               onValueChange={setDraft}
               topics={topics}
+              dropUp={dropUp}
               wrapperClassName="relative h-full"
               disabled={!feed.canPost}
               onChange={(event) => {
@@ -455,6 +462,7 @@ function AuthenticatedPostComposer({
         <TopicSuggestionList
           id={suggestionsId}
           suggestions={suggestions}
+          dropUp={dropUp}
           onPick={pickTopic}
         />
         <p role="status" className="sr-only">
