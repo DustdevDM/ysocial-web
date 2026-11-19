@@ -203,6 +203,7 @@ const sessionSchema = z.union([
 ]);
 const profileSchema = z.object({
   profile: userSchema.extend({
+    isOg: z.boolean().optional(),
     bio: z.string(),
     bannerUrl: z.string().nullable(),
     bannerCrop: bannerCropSchema.nullable(),

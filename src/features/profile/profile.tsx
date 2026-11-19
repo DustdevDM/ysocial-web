@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   CalendarDays,
   Camera,
+  Gem,
   Pencil,
   UserCheck,
   UserPlus,
@@ -20,6 +21,11 @@ import {
   RotateCcw,
   ShieldAlert,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { IconButton, IconLink } from "@/components/ui/icon-button";
 import { useGoBack } from "@/hooks/use-go-back";
 import { Button } from "@/components/ui/button";
@@ -393,9 +399,25 @@ export function ProfilePage({
           </div>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <h1 className="wrap-anywhere text-xl font-semibold">
-                {profile.profile.displayName}
-              </h1>
+              <div className="flex items-center gap-1.5">
+                <h1 className="min-w-0 wrap-anywhere text-xl font-semibold">
+                  {profile.profile.displayName}
+                </h1>
+                {profile.profile.isOg && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      type="button"
+                      aria-label="OG member"
+                      className="shrink-0 rounded p-1 text-amber-600 dark:text-amber-400"
+                    >
+                      <Gem className="size-4" aria-hidden="true" />
+                    </TooltipTrigger>
+                    <TooltipContent role="tooltip">
+                      Joined before the big migration
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
               <p className="wrap-anywhere text-sm text-muted-foreground">
                 @{profile.profile.handle}
               </p>
