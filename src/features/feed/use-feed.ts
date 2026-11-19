@@ -47,6 +47,23 @@ const feedCache = new Map<
   }
 >();
 
+async function writeClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch (error) {
+    const field = document.createElement("textarea");
+    field.value = text;
+    field.setAttribute("readonly", "");
+    field.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+    document.body.append(field);
+    field.select();
+    const copied = document.execCommand("copy");
+    field.remove();
+    if (!copied) throw error;
+  }
+}
+
 export function useFeed(
   session: Session | null,
   parentId?: string,
@@ -315,34 +332,26 @@ export function useFeed(
       onConfirmed,
     });
   }
-  async function sharePost(post: Post) {
+  async function copyPostLink(post: Post): Promise<boolean> {
     const url = new URL(`/posts/${post.id}`, window.location.origin).href;
     try {
-      if (navigator.share)
-        await navigator.share({
-          title: `Post by ${post.author.displayName}`,
-          text: post.content,
-          url,
-        });
-      else {
-        await navigator.clipboard.writeText(url);
-      }
+      await writeClipboard(url);
+      return true;
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        const id = toast.add({
-          type: "error",
-          title: "Couldn't share post",
-          description: errorMessage(error),
-          timeout: 0,
-          actionProps: {
-            children: "Retry",
-            onClick: () => {
-              toast.close(id);
-              void sharePost(post);
-            },
+      const id = toast.add({
+        type: "error",
+        title: "Couldn't copy link",
+        description: errorMessage(error),
+        timeout: 0,
+        actionProps: {
+          children: "Retry",
+          onClick: () => {
+            toast.close(id);
+            void copyPostLink(post);
           },
-        });
-      }
+        },
+      });
+      return false;
     }
   }
   return {
@@ -386,7 +395,7 @@ export function useFeed(
     canPost,
     readOnly,
     pending: optimisticPostIds,
-    sharePost,
+    copyPostLink,
     unread,
     revealNew,
     refresh: () => {

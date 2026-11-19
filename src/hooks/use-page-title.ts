@@ -2,9 +2,20 @@ import { useEffect } from "react";
 
 const SITE_NAME = "ysocial";
 
-/** Set the document title for the current page. */
+function setMeta(selector: string, content: string) {
+  document.head.querySelector(selector)?.setAttribute("content", content);
+}
+
 export function usePageTitle(title?: string) {
   useEffect(() => {
-    document.title = title ? `${title} · ${SITE_NAME}` : SITE_NAME;
+    const full = title ? `${title} · ${SITE_NAME}` : SITE_NAME;
+    document.title = full;
+    setMeta('meta[property="og:title"]', full);
+    setMeta('meta[name="twitter:title"]', full);
+    const canonical = document.head.querySelector('link[rel="canonical"]');
+    canonical?.setAttribute(
+      "href",
+      `${window.location.origin}${window.location.pathname}`.replace(/(.)\/$/, "$1"),
+    );
   }, [title]);
 }
