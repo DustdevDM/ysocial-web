@@ -39,6 +39,7 @@ import type { Session } from "@/lib/api";
 import { useFeed } from "@/features/feed/use-feed";
 import { ProfileSkeleton } from "@/components/loading-skeletons";
 import { ConnectionBanner } from "@/components/connection-banner";
+import { StagingNotice } from "@/components/staging-notice";
 import { cn } from "@/lib/utils";
 import { recallScroll, rememberScroll } from "@/lib/scroll-memory";
 import { useGoBack } from "@/hooks/use-go-back";
@@ -51,6 +52,7 @@ export function App() {
     <BrowserRouter>
       <TooltipProvider delay={250}>
         <Toaster>
+          <StagingNotice />
           <AppShell />
         </Toaster>
       </TooltipProvider>
