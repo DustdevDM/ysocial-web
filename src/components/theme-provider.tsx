@@ -1,4 +1,5 @@
 import * as React from "react"
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 
 type Theme = "dark" | "light" | "system"
 type ResolvedTheme = "dark" | "light"
@@ -95,13 +96,26 @@ export function ThemeProvider({
 
     return defaultTheme
   })
+  const [confirmLightMode, setConfirmLightMode] = React.useState(false)
 
-  const setTheme = React.useCallback(
+  const saveTheme = React.useCallback(
     (nextTheme: Theme) => {
       localStorage.setItem(storageKey, nextTheme)
       setThemeState(nextTheme)
     },
     [storageKey]
+  )
+
+  const setTheme = React.useCallback(
+    (nextTheme: Theme) => {
+      if (nextTheme === "light") {
+        if (theme !== "light") setConfirmLightMode(true)
+        return
+      }
+
+      saveTheme(nextTheme)
+    },
+    [theme, saveTheme]
   )
 
   const applyTheme = React.useCallback(
@@ -158,6 +172,8 @@ export function ThemeProvider({
     if (event.key.toLowerCase() !== "d") {
       return
     }
+
+    if (confirmLightMode) return
 
     const nextTheme =
       theme === "dark"
@@ -216,6 +232,17 @@ export function ThemeProvider({
   return (
     <ThemeProviderContext.Provider {...props} value={value}>
       {children}
+      <ConfirmationDialog
+        open={confirmLightMode}
+        onOpenChange={setConfirmLightMode}
+        title="Switch to light mode?"
+        description="This will change the site's appearance to light mode."
+        confirmLabel="Switch to light"
+        onConfirm={() => {
+          saveTheme("light")
+          return true
+        }}
+      />
     </ThemeProviderContext.Provider>
   )
 }
