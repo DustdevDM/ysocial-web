@@ -436,6 +436,11 @@ export function ProfilePage({
               <p className="wrap-anywhere text-sm text-muted-foreground">
                 @{profile.profile.handle}
               </p>
+              {profile.profile.pronouns && (
+                <p className="wrap-anywhere text-sm text-muted-foreground">
+                  <bdi>{profile.profile.pronouns}</bdi>
+                </p>
+              )}
             </div>
             {canEditProfile && (
               <Dialog
@@ -455,7 +460,7 @@ export function ProfilePage({
                   <DialogHeader>
                     <DialogTitle>Edit profile</DialogTitle>
                     <DialogDescription>
-                      Update your name, handle, and bio.
+                      Update your name, handle, pronouns, and bio.
                     </DialogDescription>
                   </DialogHeader>
                   {editDialogOpen && (

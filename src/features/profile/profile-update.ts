@@ -1,6 +1,9 @@
 import type { Profile } from "@/lib/api";
 
-type ProfileFields = Pick<Profile["profile"], "handle" | "displayName" | "bio">;
+type ProfileFields = Pick<
+  Profile["profile"],
+  "handle" | "displayName" | "bio" | "pronouns"
+>;
 
 export function profileChanges(
   saved: ProfileFields,
@@ -12,5 +15,8 @@ export function profileChanges(
       ? { displayName: draft.displayName }
       : {}),
     ...(draft.bio !== saved.bio ? { bio: draft.bio } : {}),
+    ...(draft.pronouns.trim() !== saved.pronouns
+      ? { pronouns: draft.pronouns.trim() }
+      : {}),
   };
 }

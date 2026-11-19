@@ -194,6 +194,7 @@ const sessionSchema = z.union([
       byProfileHandle: z.string().nullable().default(null),
     }).nullable().default(null),
     user: userSchema.extend({
+      pronouns: z.string().default(""),
       bannerUrl: z.string().nullable(),
       bannerCrop: bannerCropSchema.nullable(),
     }),
@@ -210,6 +211,7 @@ const profileSchema = z.object({
       tooltip: z.string(),
     })).default([]),
     bio: z.string(),
+    pronouns: z.string().default(""),
     bannerUrl: z.string().nullable(),
     bannerCrop: bannerCropSchema.nullable(),
     createdAt: z.string(),
@@ -232,6 +234,7 @@ const profileSchema = z.object({
 const profileCardSchema = z.object({
   profile: userSchema.extend({
     bio: z.string(),
+    pronouns: z.string().default(""),
     bannerUrl: z.string().nullable(),
     bannerCrop: bannerCropSchema.nullable(),
     createdAt: z.string(),
@@ -461,7 +464,7 @@ function friendlyMessage(error: unknown) {
     if (error.message === "profile_not_found")
       return "This profile does not exist.";
     if (error.message === "invalid_profile")
-      return "Check your handle, display name, and bio, then try again.";
+      return "Check your profile details, then try again.";
     if (error.message === "gif_search_limit")
       return "GIF search limit reached. Try again later.";
     if (error.message === "gif_search_unavailable")
@@ -603,6 +606,18 @@ function attemptSignal(ms: number, signal?: AbortSignal) {
 }
 const postPath = (id: string) => `/api/posts/${encodeURIComponent(id)}`;
 export const api = {
+  pronounRecommendations: (signal: AbortSignal) =>
+    request(
+      "/api/profiles/pronouns/recommendations",
+      z.object({
+        languages: z.record(z.string(), z.array(z.string())),
+        general: z.array(z.string()),
+        maxLength: z.number().int().positive(),
+      }),
+      "GET",
+      undefined,
+      signal,
+    ),
   notifications: (cursor?: string, unread = false, signal?: AbortSignal) =>
     request(
       `/api/notifications?unread=${unread}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
@@ -659,7 +674,7 @@ export const api = {
     ),
   updateProfile: (
     profile: Partial<
-      Pick<Profile["profile"], "handle" | "displayName" | "bio">
+      Pick<Profile["profile"], "handle" | "displayName" | "bio" | "pronouns">
     >,
     signal?: AbortSignal,
   ) =>
@@ -669,6 +684,7 @@ export const api = {
         handle: z.string(),
         displayName: z.string(),
         bio: z.string(),
+        pronouns: z.string().default(""),
       }),
       "PATCH",
       profile,
@@ -679,9 +695,10 @@ export const api = {
       attemptSignal(5000, signal)),
   session: (signal?: AbortSignal) =>
     request("/auth/me", sessionSchema, "GET", undefined, signal),
-  onboard: (handle: string) =>
+  onboard: (handle: string, pronouns: string) =>
     request("/auth/profile", z.object({ user: userSchema }), "POST", {
       handle,
+      pronouns,
     }),
   searchGifs: (query: string, page = 1, signal?: AbortSignal) =>
     request(

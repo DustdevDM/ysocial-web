@@ -270,7 +270,7 @@ function MyProfileRoute({ auth }: { auth: AuthState }) {
   );
 }
 function OnboardingRoute({ session }: { session: Session | null }) {
-  usePageTitle("Choose your handle");
+  usePageTitle("Create your profile");
   return session?.authenticated && !session.needsOnboarding ? (
     <Navigate to={`/@${session.user.handle}`} replace />
   ) : null;

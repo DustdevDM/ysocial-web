@@ -202,6 +202,7 @@ export function useAuth() {
               ...current.user,
               handle: profile.handle,
               displayName: profile.displayName,
+              pronouns: profile.pronouns,
             },
           }
         : current,
@@ -229,8 +230,8 @@ export function useAuth() {
       }
       setWelcomeUserId(undefined);
     },
-    onboard: (handle: string) => act(async () => {
-      const result = await api.onboard(handle);
+    onboard: (handle: string, pronouns: string) => act(async () => {
+      const result = await api.onboard(handle, pronouns);
       rememberPendingApproval(result.user.id);
     }),
     logout,

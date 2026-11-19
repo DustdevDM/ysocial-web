@@ -198,7 +198,7 @@ export function ProfileCard({
                 <DialogHeader>
                   <DialogTitle>Edit profile</DialogTitle>
                   <DialogDescription>
-                    Update your name, handle, and bio.
+                    Update your name, handle, pronouns, and bio.
                   </DialogDescription>
                 </DialogHeader>
                 {loadError ? (

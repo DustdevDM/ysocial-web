@@ -39,6 +39,10 @@ export function peekProfileCard(handle: string) {
   return entries.get(handle.toLowerCase())?.value;
 }
 
+export function invalidateProfileCard(handle: string) {
+  entries.delete(handle.toLowerCase());
+}
+
 export function patchProfileCard(handle: string, patch: Partial<ProfileCard>) {
   const entry = entries.get(handle.toLowerCase());
   if (!entry?.value) return;
