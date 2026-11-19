@@ -204,6 +204,12 @@ const sessionSchema = z.union([
 const profileSchema = z.object({
   profile: userSchema.extend({
     isOg: z.boolean().optional(),
+    isAdmin: z.boolean().optional(),
+    badges: z.array(z.object({
+      id: z.uuid(),
+      icon: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+      tooltip: z.string(),
+    })).default([]),
     bio: z.string(),
     bannerUrl: z.string().nullable(),
     bannerCrop: bannerCropSchema.nullable(),

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   api,
   ApiError,
@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Camera,
   Gem,
+  Terminal,
   Pencil,
   UserCheck,
   UserPlus,
@@ -55,6 +56,21 @@ import {
   rememberProfile,
   updateAuthor,
 } from "@/features/feed/optimistic-actions";
+
+function ProfileBadge({ label, tooltip, children }: {
+  label: string;
+  tooltip: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger type="button" aria-label={label} className="shrink-0 rounded p-1">
+        {children}
+      </TooltipTrigger>
+      <TooltipContent role="tooltip">{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function ProfilePage({
   handle,
@@ -399,24 +415,29 @@ export function ProfilePage({
           </div>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-x-1.5">
                 <h1 className="min-w-0 wrap-anywhere text-xl font-semibold">
                   {profile.profile.displayName}
                 </h1>
                 {profile.profile.isOg && (
-                  <Tooltip>
-                    <TooltipTrigger
-                      type="button"
-                      aria-label="OG member"
-                      className="shrink-0 rounded p-1 text-amber-600 dark:text-amber-400"
-                    >
-                      <Gem className="size-4" aria-hidden="true" />
-                    </TooltipTrigger>
-                    <TooltipContent role="tooltip">
-                      Joined before the big migration
-                    </TooltipContent>
-                  </Tooltip>
+                  <ProfileBadge label="OG member" tooltip="Joined before the big migration">
+                    <Gem className="size-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                  </ProfileBadge>
                 )}
+                {profile.profile.isAdmin && (
+                  <ProfileBadge label="Admin" tooltip="Developed this">
+                    <Terminal className="size-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+                  </ProfileBadge>
+                )}
+                {profile.profile.badges.map((badge) => (
+                  <ProfileBadge key={badge.id} label={badge.tooltip} tooltip={badge.tooltip}>
+                    <span
+                      aria-hidden="true"
+                      className="block size-4 bg-current mask-contain mask-center mask-no-repeat"
+                      style={{ maskImage: `url("/api/profiles/badge-icons/${badge.icon}")` }}
+                    />
+                  </ProfileBadge>
+                ))}
               </div>
               <p className="wrap-anywhere text-sm text-muted-foreground">
                 @{profile.profile.handle}
