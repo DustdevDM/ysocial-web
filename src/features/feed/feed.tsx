@@ -48,6 +48,9 @@ export function Feed({
     composerBox,
     showComposer && feed.canPost,
   );
+  const selfReplyIds = new Set(
+    feedPosts.flatMap((post) => (post.selfReply ? [post.selfReply.id] : [])),
+  );
   useEffect(() => {
     const target = sentinel.current;
     if (!target || !loadMore || loading || error) return;
@@ -92,14 +95,18 @@ export function Feed({
             </IconButton>
           </div>
         )}
-        {feed.feedPosts.map((post) => (
-          <div
-            key={post.id}
-            className={feed.enteringIds.has(post.id) ? "live-enter" : undefined}
-          >
-            <FeedItem post={post} feed={feed} />
-          </div>
-        ))}
+        {feed.feedPosts
+          .filter((post) => !selfReplyIds.has(post.id))
+          .map((post) => (
+            <div
+              key={post.id}
+              className={
+                feed.enteringIds.has(post.id) ? "live-enter" : undefined
+              }
+            >
+              <FeedItem post={post} feed={feed} />
+            </div>
+          ))}
         {feed.loading && (
           <PostListSkeleton
             count={feed.feedPosts.length ? 2 : 4}
@@ -142,7 +149,39 @@ function FeedItem({ post, feed }: { post: Post; feed: FeedState }) {
   });
   const repost = feed.repostContext(post);
   if (ancestors.length === 0) {
-    return <PostCard post={post} feed={feed} repost={repost} replyContext />;
+    const selfReply = post.selfReply ? feed.resolvePost(post.selfReply) : null;
+    if (!selfReply)
+      return <PostCard post={post} feed={feed} repost={repost} replyContext />;
+    const hidden = selfReply.replies;
+    return (
+      <div>
+        <PostCard
+          post={post}
+          feed={feed}
+          repost={repost}
+          replyContext
+          connectToNext="tight"
+        />
+        <PostCard
+          post={selfReply}
+          feed={feed}
+          compact
+          connectFromPrev
+          connectToNext={hidden > 0 ? "tight" : false}
+        />
+        {hidden > 0 && (
+          <div className="relative pb-3 pl-12">
+            <Link
+              to={`/posts/${selfReply.id}`}
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              <Ellipsis className="size-3.5" aria-hidden="true" />
+              {hidden} {hidden === 1 ? "comment" : "comments"} hidden
+            </Link>
+          </div>
+        )}
+      </div>
+    );
   }
   const collapse = ancestors.length > MAX_SHOWN_ANCESTORS;
   const items: ({ ancestor: Post } | { gap: number })[] = collapse

@@ -124,6 +124,8 @@ const basePostSchema = z.object({
 const postSchema = basePostSchema.extend({
   // Topic pages only: the posts above a reply, root first.
   ancestors: z.array(basePostSchema).optional(),
+  // Home and topic lists: the author's own first reply to this post.
+  selfReply: basePostSchema.nullable().optional(),
 });
 const topicCountSchema = z.object({ name: z.string(), count: z.number() });
 const pageSchema = z.object({
