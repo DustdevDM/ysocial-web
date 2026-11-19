@@ -93,7 +93,7 @@ export function QuotedPostCard({
             mentions: post.mentions,
           }}
           previewExternalLinks
-          className="mt-1.5 line-clamp-6 text-sm leading-relaxed break-words whitespace-pre-wrap"
+          className="mt-1.5 text-sm leading-relaxed break-words whitespace-pre-wrap"
         />
       )}
       {post.gif && (
