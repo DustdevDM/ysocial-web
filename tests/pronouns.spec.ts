@@ -2,6 +2,44 @@ import { expect, test } from "@playwright/test";
 
 test.use({ locale: "de-DE", reducedMotion: "reduce" });
 
+test.describe("mobile onboarding", () => {
+  test.use({
+    isMobile: true,
+    hasTouch: true,
+    viewport: { width: 390, height: 700 },
+  });
+
+  test("keeps both pronoun step actions in view", async ({ page }) => {
+    await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
+    await page.route("**/api/profiles/*/availability", (route) =>
+      route.fulfill({ json: { available: true } }),
+    );
+    await page.route("**/auth/me", (route) =>
+      route.fulfill({
+        json: {
+          authenticated: true,
+          needsOnboarding: true,
+          user: null,
+          avatarUrl: null,
+          suggestedHandle: "pronouns_user",
+        },
+      }),
+    );
+
+    await page.goto("/onboarding");
+    await page.getByRole("button", { name: "Continue", exact: true }).tap();
+    await expect(
+      page.getByRole("heading", { name: "What are your pronouns?" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Back" })).toBeInViewport({
+      ratio: 1,
+    });
+    await expect(
+      page.getByRole("button", { name: "Create profile" }),
+    ).toBeInViewport({ ratio: 1 });
+  });
+});
+
 test("onboarding and profile editing save suggested and custom pronouns", async ({
   page,
 }) => {

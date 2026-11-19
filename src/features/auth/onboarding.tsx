@@ -185,7 +185,7 @@ export function Onboarding({
               {auth.error}
             </p>
           )}
-          <DialogFooter className="-mx-5 flex-row items-center justify-between gap-3 px-5 py-5 sm:-mx-6 sm:px-6">
+          <DialogFooter className="-mx-5 flex-row items-center justify-between gap-3 px-5 py-5 *:w-auto sm:-mx-6 sm:px-6">
             {!choosingHandle && (
               <Button
                 type="button"
