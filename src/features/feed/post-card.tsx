@@ -10,6 +10,7 @@ import { MentionLink } from "./mention-text";
 import { MentionTextarea } from "./mention-textarea";
 import { PostActions } from "./post-actions";
 import { PostText } from "./post-text";
+import { hasTooManyBlankLines, limitBlankLines } from "./post-content";
 import { PostPoll } from "./post-poll";
 import { QuotedPostCard } from "./quoted-post";
 import { RepostHeader } from "./repost-header";
@@ -120,15 +121,18 @@ export function PostCard({
     if (feed.editPost(post, finalContent)) setEditing(false);
   }
   function startEditing() {
+    const editableContent = hasTooManyBlankLines(post.content)
+      ? limitBlankLines(post.content.replace(/\r\n/g, "\n")).value
+      : post.content;
     const loaded = peekEmojiIndex();
-    if (loaded || !/[^ -~\s]/.test(post.content)) {
-      setContent(loaded ? toShortcodes(post.content, loaded) : post.content);
+    if (loaded || !/[^ -~\s]/.test(editableContent)) {
+      setContent(loaded ? toShortcodes(editableContent, loaded) : editableContent);
       setEditing(true);
       return;
     }
     loadEmojiIndex()
-      .then((index) => setContent(toShortcodes(post.content, index)))
-      .catch(() => setContent(post.content))
+      .then((index) => setContent(toShortcodes(editableContent, index)))
+      .catch(() => setContent(editableContent))
       .finally(() => setEditing(true));
   }
   return (
@@ -300,6 +304,7 @@ export function PostCard({
               </label>
               <MentionTextarea
                 id={editorId}
+                limitPostBlankLines
                 aria-describedby={editorHelpId}
                 aria-invalid={!validCaption}
                 autoFocus
@@ -349,6 +354,7 @@ export function PostCard({
                 key={`${post.id}:${post.editedAt ?? ""}:${post.content}`}
                 post={post}
                 previewExternalLinks={!optimistic}
+                collapsible={!focused}
                 className={cn(
                   "mt-2 whitespace-pre-wrap break-words",
                   jumbo > 0 && jumbo <= JUMBO_MAX

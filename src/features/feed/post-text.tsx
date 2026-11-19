@@ -1,4 +1,11 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link2 } from "lucide-react";
 import { Link } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +35,7 @@ const chipClassName =
   "inline-flex max-w-full items-center gap-1 rounded-md bg-blue-500/10 px-1.5 py-0.5 align-baseline text-xs font-medium leading-4 text-blue-700 outline-none transition-colors hover:bg-blue-500/20 focus-visible:ring-2 focus-visible:ring-ring dark:text-blue-300";
 const chipPlaceholderClassName =
   "inline-flex w-32 max-w-full items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 align-baseline outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const previewLines = 6;
 
 /** What PostText needs of a post. Quoted posts carry only an id and content. */
 type TextPost = Pick<Post, "id" | "content"> &
@@ -37,10 +45,12 @@ export function PostText({
   post,
   className,
   previewExternalLinks,
+  collapsible = true,
 }: {
   post: TextPost;
   className: string;
   previewExternalLinks: boolean;
+  collapsible?: boolean;
 }) {
   const parts = useMemo(
     () => splitPostLinks(post.content, import.meta.env.DEV),
@@ -62,6 +72,23 @@ export function PostText({
     embed,
     previewExternalLinks,
   );
+  const captionId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const [overflowHeight, setOverflowHeight] = useState(0);
+  useLayoutEffect(() => {
+    const caption = captionRef.current;
+    if (!collapsible || !caption) return;
+    const measure = () => {
+      const lineHeight = Number.parseFloat(getComputedStyle(caption).lineHeight);
+      const height = Math.ceil(caption.getBoundingClientRect().height);
+      setOverflowHeight(height > lineHeight * previewLines + 1 ? height : 0);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(caption);
+    return () => observer.disconnect();
+  }, [captionRef, collapsible]);
+  const overflows = collapsible && overflowHeight > 0;
   const websites = details?.websites;
   const websiteEmbed =
     embed?.kind === "external"
@@ -255,14 +282,55 @@ export function PostText({
 
   return (
     <>
-      <p
-        ref={captionRef}
-        data-selectable
-        aria-busy={loading || undefined}
-        className={className}
+      <div
+        className={cn(
+          className,
+          overflows &&
+            "overflow-clip motion-safe:transition-[max-height,mask-size] motion-safe:duration-300 motion-safe:ease-out",
+        )}
+        style={
+          overflows
+            ? {
+                maxHeight: expanded ? overflowHeight : `${previewLines}lh`,
+                maskImage: "linear-gradient(black calc(100% - 1lh), transparent)",
+                // Move the fade below the text as the preview expands.
+                maskSize: expanded ? "100% calc(100% + 1lh)" : "100% 100%",
+                maskRepeat: "no-repeat",
+              }
+            : undefined
+        }
+        onFocus={(event) => {
+          if (
+            overflows &&
+            !expanded &&
+            event.target.getBoundingClientRect().bottom >
+              event.currentTarget.getBoundingClientRect().bottom
+          ) {
+            setExpanded(true);
+          }
+        }}
       >
-        {renderRich()}
-      </p>
+        <p
+          id={captionId}
+          ref={captionRef}
+          data-selectable
+          aria-busy={loading || undefined}
+          className="flow-root"
+        >
+          {renderRich()}
+        </p>
+      </div>
+      {overflows && (
+        <button
+          type="button"
+          aria-controls={captionId}
+          aria-expanded={expanded}
+          className="mt-1 block cursor-pointer rounded-sm text-sm font-medium text-mention underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "Read less" : "Read more"}
+        </button>
+      )}
       {embed && loading && (
         <EmbedSkeleton website={embed.kind === "external"} />
       )}

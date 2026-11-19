@@ -308,6 +308,7 @@ function AuthenticatedPostComposer({
               ref={textarea}
               aria-label={placeholder.replace("…", "")}
               aria-describedby={helpId}
+              limitPostBlankLines
               aria-controls={suggestions.open ? suggestionsId : undefined}
               aria-activedescendant={
                 suggestions.open && suggestions.index >= 0

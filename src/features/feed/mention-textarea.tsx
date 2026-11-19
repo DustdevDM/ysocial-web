@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { DraftHighlight } from "./draft-highlight";
+import { limitBlankLines } from "./post-content";
 import { api } from "@/lib/api";
 import {
   findEmojis,
@@ -54,6 +55,7 @@ export function MentionTextarea({
   ref,
   emojis = "render",
   topics = false,
+  limitPostBlankLines = false,
   dropUp = false,
   wrapperClassName = "relative",
   className,
@@ -64,6 +66,7 @@ export function MentionTextarea({
   onValueChange: (value: string) => void;
   emojis?: "render" | "plain";
   topics?: boolean;
+  limitPostBlankLines?: boolean;
   dropUp?: boolean;
   wrapperClassName?: string;
 }) {
@@ -229,6 +232,13 @@ export function MentionTextarea({
         }}
         onChange={(event) => {
           const element = event.currentTarget;
+          if (limitPostBlankLines) {
+            const next = limitBlankLines(element.value, element.selectionStart);
+            if (next.value !== element.value) {
+              element.value = next.value;
+              element.setSelectionRange(next.caret, next.caret);
+            }
+          }
           setCaret(element.selectionStart);
           onChange?.(event);
           const native = event.nativeEvent as InputEvent;

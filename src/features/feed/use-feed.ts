@@ -22,6 +22,7 @@ import {
   publishOptimistically,
   subscribeToLocalPosts,
 } from "./post-outbox";
+import { hasTooManyBlankLines } from "./post-content";
 import {
   cachedReposts,
   getActionRevision,
@@ -289,7 +290,8 @@ export function useFeed(
       session.pendingApproval ||
       session.ban ||
       (!content && !gif && !poll && !voice) ||
-      Array.from(content).length > 2000
+      Array.from(content).length > 2000 ||
+      hasTooManyBlankLines(content)
     )
       return;
     const sending = publishOptimistically({
@@ -320,7 +322,8 @@ export function useFeed(
       session.pendingApproval ||
       session.ban ||
       (!content && !gif && !poll && !voice) ||
-      Array.from(content).length > 2000
+      Array.from(content).length > 2000 ||
+      hasTooManyBlankLines(content)
     )
       return;
     return publishOptimistically({
@@ -437,7 +440,8 @@ export function useFeed(
       const trimmed = content.trim();
       return canPost && viewerId &&
         (trimmed || post.gif || post.poll || post.voice) &&
-        Array.from(trimmed).length <= 2000
+        Array.from(trimmed).length <= 2000 &&
+        !hasTooManyBlankLines(trimmed)
         ? mutatePost(post, viewerId, {
             kind: "edit",
             content: trimmed,
