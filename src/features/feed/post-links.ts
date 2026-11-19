@@ -13,7 +13,7 @@ export type PostLink =
       postId: string;
     };
 
-type PostPart = { kind: "text"; text: string } | PostLink;
+export type PostPart = { kind: "text"; text: string } | PostLink;
 
 export function splitPostLinks(content: string, development = false) {
   const parts: PostPart[] = [];
