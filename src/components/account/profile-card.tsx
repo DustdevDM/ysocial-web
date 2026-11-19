@@ -77,7 +77,8 @@ export function ProfileCard({
   const initials = user
     ? (user.displayName.trim() || user.handle).slice(0, 2)
     : null;
-  const editable = !!user && !!auth;
+  const editable =
+    !!user && !!auth && session?.authenticated && !session.needsOnboarding && !session.pendingApproval && !session.ban;
   return (
     <section aria-labelledby="profile-heading">
       <div className="relative aspect-[3/1] rounded-xl bg-linear-to-br from-muted to-muted/40">

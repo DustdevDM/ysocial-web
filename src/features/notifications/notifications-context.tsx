@@ -10,7 +10,7 @@ import {
 import { api, errorMessage, type SocialNotification } from "@/lib/api";
 import { NotificationPrompt } from "./notification-prompt";
 
-function useNotificationState(userId: string | null) {
+function useNotificationState(userId: string | null, canWrite: boolean) {
   const [items, setItems] = useState<SocialNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -87,7 +87,7 @@ function useNotificationState(userId: string | null) {
   }, [refresh, userId]);
   async function markRead(id?: string) {
     const newest = items[0];
-    if (busy || (!id && !newest)) return false;
+    if (!canWrite || busy || (!id && !newest)) return false;
     setBusy(true);
     setError("");
     try {
@@ -112,6 +112,7 @@ function useNotificationState(userId: string | null) {
     refresh,
     markRead,
     signedIn: !!userId,
+    canWrite,
   };
 }
 const NotificationsContext = createContext<ReturnType<
@@ -119,15 +120,19 @@ const NotificationsContext = createContext<ReturnType<
 > | null>(null);
 export function NotificationsProvider({
   userId,
+  canWrite,
+  holdPrompt,
   children,
 }: {
   userId: string | null;
+  canWrite: boolean;
+  holdPrompt: boolean;
   children: ReactNode;
 }) {
-  const value = useNotificationState(userId);
+  const value = useNotificationState(userId, canWrite);
   return (
     <NotificationsContext.Provider value={value}>
-      {userId && <NotificationPrompt key={userId} userId={userId} />}
+      {userId && canWrite && !holdPrompt && <NotificationPrompt key={userId} userId={userId} />}
       {children}
     </NotificationsContext.Provider>
   );

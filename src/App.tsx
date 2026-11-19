@@ -28,7 +28,7 @@ import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { IconLink } from "@/components/ui/icon-button";
 import { Feed } from "@/features/feed/feed";
-import { Account } from "@/features/auth/account";
+import { Account, ApprovalBanner } from "@/features/auth/account";
 import { useAuth, type AuthState } from "@/features/auth/use-auth";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Thread } from "@/features/feed/thread";
@@ -60,6 +60,8 @@ export function App() {
 
 function AppShell() {
   const auth = useAuth();
+  const awaitingApproval = auth.session?.authenticated && !auth.session.needsOnboarding
+    && auth.session.pendingApproval && !auth.session.ban;
   // State, not a ref: the section is recreated when the signed-in session
   // arrives, and the scroll listeners must follow the live element.
   const [scroller, setScroller] = useState<HTMLElement | null>(null);
@@ -138,10 +140,16 @@ function AppShell() {
           ? auth.session.user.id
           : null
       }
+      canWrite={
+        !!auth.session?.authenticated && !auth.session.needsOnboarding && !auth.session.pendingApproval && !auth.session.ban
+      }
+      holdPrompt={auth.showApprovalWelcome}
     >
       <div className="relative flex h-dvh min-h-0 flex-col">
         <MobileHeader auth={auth} onLogoClick={handleLogoClick} />
+        {awaitingApproval && <div aria-hidden="true" className="h-[calc(4rem+env(safe-area-inset-top))] shrink-0 md:hidden" />}
         <ConnectionBanner />
+        {awaitingApproval && <ApprovalBanner />}
         <main
           className={cn(
             "grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden md:divide-x md:divide-border",
@@ -159,7 +167,10 @@ function AppShell() {
             ref={setScroller}
             aria-label="Main content"
             tabIndex={0}
-            className="content-scroll min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-4 max-md:pt-[calc(4.75rem+env(safe-area-inset-top))] pb-[calc(6.5rem+env(safe-area-inset-bottom))] has-[[data-skeleton-scroll-lock]]:overflow-y-hidden sm:px-10 sm:pt-6 md:pb-6 lg:px-12"
+            className={cn(
+              "content-scroll min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 pt-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] has-[[data-skeleton-scroll-lock]]:overflow-y-hidden sm:px-10 sm:pt-6 md:pb-6 lg:px-12",
+              awaitingApproval ? "max-md:pt-3" : "max-md:pt-[calc(4.75rem+env(safe-area-inset-top))]",
+            )}
           >
             <Account auth={auth} />
             <Routes>

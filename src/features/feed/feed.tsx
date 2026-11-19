@@ -77,7 +77,7 @@ export function Feed({
       <div ref={anchor} />
       <NewPostsNudge count={unread} anchor={anchor} onShow={revealNew} />
       {header}
-      {showComposer && (
+      {showComposer && !feed.readOnly && (
         <div ref={composerBox} className="min-h-[6.5rem]">
           {feed.sessionLoading ? (
             <ComposerSkeleton />
