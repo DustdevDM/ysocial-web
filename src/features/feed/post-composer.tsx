@@ -201,7 +201,7 @@ function AuthenticatedPostComposer({
   useLayoutEffect(() => {
     const copy = mirror.current;
     if (!copy) return;
-    const update = () => setHeight(copy.offsetHeight);
+    const update = () => setHeight(copy.offsetHeight || undefined);
     update();
     const observer = new ResizeObserver(update);
     observer.observe(copy);
@@ -291,7 +291,7 @@ function AuthenticatedPostComposer({
             </div>
           )}
           <div
-            className="relative min-w-0 flex-1 basis-[calc(100%-0.5rem)] transition-[height] duration-200 ease-out"
+            className="relative min-h-9 min-w-0 flex-1 basis-[calc(100%-0.5rem)] transition-[height] duration-200 ease-out"
             style={{
               height: height ? Math.min(height, MAX_HEIGHT) : undefined,
             }}

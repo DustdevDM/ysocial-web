@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-type Target = { open: () => void } | null;
+type Target = { open: () => void; kind?: "post" | "reply" } | null;
 
 let target: Target = null;
 const listeners = new Set<() => void>();

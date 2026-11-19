@@ -18,6 +18,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { IconButton, IconLink } from "@/components/ui/icon-button";
 import { PostCard } from "./post-card";
+import { NewPostDialog } from "./feed-floaters";
 import { PostComposer } from "./post-composer";
 import { PostActivity } from "./post-activity";
 import { useFeed, type FeedState } from "./use-feed";
@@ -322,7 +323,13 @@ export function Thread({
               This conversation is long. Open a reply to see more of it.
             </p>
           )}
-          <div className="sticky bottom-0 z-20 mt-4 bg-linear-to-t from-background from-70% to-transparent pt-4 pb-1">
+          <NewPostDialog
+            feed={feed}
+            kind="reply"
+            show={!feed.sessionLoading}
+            anchor={focusedRef}
+          />
+          <div className="sticky bottom-0 z-20 mt-4 hidden bg-linear-to-t from-background from-70% to-transparent pt-4 pb-1 md:block">
             <PostComposer
               feed={feed}
               placeholder="Write a reply…"

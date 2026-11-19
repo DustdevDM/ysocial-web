@@ -33,7 +33,7 @@ export function ComposerSkeleton() {
       className="mx-auto w-full max-w-xl"
       lockScroll
     >
-      <div className="flex h-[6.5rem] flex-col justify-between rounded-[1.75rem] bg-muted p-2 pl-4 sm:pl-5">
+      <div className="flex h-24 flex-col justify-between rounded-[1.75rem] bg-muted p-2 pl-4 sm:pl-5">
         <Skeleton className="mt-2 h-4 w-40 max-w-[75%] bg-foreground/10" />
         <div className="flex items-center justify-end">
           <Skeleton className="size-9 shrink-0 rounded-full bg-foreground/10" />

@@ -1,5 +1,5 @@
 import type { MouseEventHandler } from "react";
-import { House, Plus, Search, UserRound } from "lucide-react";
+import { House, MessageCircle, Plus, Search, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { LegalMenu } from "./legal-menu";
 import { ProgressiveBlur } from "@/components/ui/progressive-blur";
@@ -104,11 +104,15 @@ export function MobileNavigation({ auth }: { auth: AuthState }) {
         {newPost && (
           <button
             type="button"
-            aria-label="Write a new post"
+            aria-label={newPost.kind === "reply" ? "Write a reply" : "Write a new post"}
             onClick={newPost.open}
             className="pointer-events-auto flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_32px_-8px_rgb(0_0_0/0.5)] ring-1 ring-white/15 outline-none animate-in fade-in-0 zoom-in-75 duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-white/90 motion-reduce:animate-none"
           >
-            <Plus className="size-6" aria-hidden="true" strokeWidth={2.5} />
+            {newPost.kind === "reply" ? (
+              <MessageCircle className="size-6" aria-hidden="true" strokeWidth={2.5} />
+            ) : (
+              <Plus className="size-6" aria-hidden="true" strokeWidth={2.5} />
+            )}
           </button>
         )}
       </div>

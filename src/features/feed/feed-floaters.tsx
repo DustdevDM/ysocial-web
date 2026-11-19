@@ -91,33 +91,37 @@ export function NewPostDialog({
   feed,
   show,
   anchor,
+  kind = "post",
 }: {
   feed: FeedState;
   show: boolean;
   anchor: RefObject<Element | null>;
+  /** A reply composer opens from the mobile nav only; desktop has it inline. */
+  kind?: "post" | "reply";
 }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    setNewPostTarget(show ? { open: () => setOpen(true) } : null);
+    setNewPostTarget(show ? { open: () => setOpen(true), kind } : null);
     return () => setNewPostTarget(null);
-  }, [show]);
+  }, [show, kind]);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto pt-12 sm:max-w-lg">
         <DialogHeader className="absolute top-1 left-4 flex h-11 justify-center sm:top-2 sm:h-8">
           <DialogTitle className="text-base font-semibold">
-            Write a post
+            {kind === "reply" ? "Write a reply" : "Write a post"}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Write a post, add a GIF, voice message or poll.
+            {kind === "reply" ? "Write a reply, add a GIF, voice message or poll." : "Write a post, add a GIF, voice message or poll."}
           </DialogDescription>
         </DialogHeader>
         <PostComposer
           feed={feed}
           autoFocus
+          placeholder={kind === "reply" ? "Write a reply…" : undefined}
           onSubmitted={() => {
             setOpen(false);
-            scrollFeedToTop(anchor.current);
+            if (kind === "post") scrollFeedToTop(anchor.current);
           }}
         />
       </DialogContent>
