@@ -12,6 +12,12 @@ import { PostCard } from "./post-card";
 import type { Post } from "@/lib/api";
 import type { FeedState } from "./use-feed";
 import { PullToRefresh } from "./pull-to-refresh.tsx";
+import {
+  NewPostDialog,
+  NewPostsNudge,
+  useAtTop,
+  useOutOfView,
+} from "./feed-floaters";
 
 // Start fetching the next page while the reader is still this far (in px)
 // above the end of the list, so new posts are usually there before they scroll.
@@ -32,7 +38,16 @@ export function Feed({
   emptyMessage?: string;
 }) {
   const sentinel = useRef<HTMLDivElement>(null);
-  const { loadMore, loading, error, feedPosts } = feed;
+  const composerBox = useRef<HTMLDivElement>(null);
+  const anchor = useRef<HTMLDivElement>(null);
+  const { loadMore, loading, error, feedPosts, unread, revealNew } = feed;
+  useAtTop(anchor, () => {
+    if (unread) revealNew();
+  });
+  const composerHidden = useOutOfView(
+    composerBox,
+    showComposer && feed.canPost,
+  );
   useEffect(() => {
     const target = sentinel.current;
     if (!target || !loadMore || loading || error) return;
@@ -56,9 +71,11 @@ export function Feed({
       onRefresh={feed.refresh}
       refreshKey={refreshKey}
     >
+      <div ref={anchor} />
+      <NewPostsNudge count={unread} anchor={anchor} onShow={revealNew} />
       {header}
       {showComposer && (
-        <div className="min-h-13 md:min-h-14">
+        <div ref={composerBox} className="min-h-[6.5rem]">
           {feed.sessionLoading ? (
             <ComposerSkeleton />
           ) : (
@@ -106,6 +123,9 @@ export function Feed({
       </div>
       {feed.loadMore && (
         <div ref={sentinel} aria-hidden="true" className="h-px" />
+      )}
+      {showComposer && feed.canPost && (
+        <NewPostDialog feed={feed} show={composerHidden} anchor={anchor} />
       )}
     </PullToRefresh>
   );
