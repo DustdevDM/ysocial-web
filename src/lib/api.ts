@@ -203,8 +203,7 @@ const sessionSchema = z.union([
 ]);
 const profileSchema = z.object({
   profile: userSchema.extend({
-    isOg: z.boolean().optional(),
-    isAdmin: z.boolean().optional(),
+    isOg: z.boolean().default(false),
     badges: z.array(z.object({
       id: z.uuid(),
       icon: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),

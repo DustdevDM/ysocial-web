@@ -14,7 +14,6 @@ import {
   CalendarDays,
   Camera,
   Gem,
-  Terminal,
   Pencil,
   UserCheck,
   UserPlus,
@@ -422,11 +421,6 @@ export function ProfilePage({
                 {profile.profile.isOg && (
                   <ProfileBadge label="OG member" tooltip="Joined before the big migration">
                     <Gem className="size-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-                  </ProfileBadge>
-                )}
-                {profile.profile.isAdmin && (
-                  <ProfileBadge label="Admin" tooltip="Developed this">
-                    <Terminal className="size-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />
                   </ProfileBadge>
                 )}
                 {profile.profile.badges.map((badge) => (
