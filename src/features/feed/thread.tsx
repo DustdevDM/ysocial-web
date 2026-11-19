@@ -286,12 +286,6 @@ export function Thread({
               connectFromPrev={ancestorItems.length > 0}
             />
           </div>
-          <div className="mt-4 mb-6">
-            <PostComposer
-              feed={feed}
-              placeholder="Write a reply…"
-            />
-          </div>
           <h2 className="mb-1 text-base font-semibold">
             Replies
             {totalReplies > 0 && (
@@ -328,6 +322,13 @@ export function Thread({
               This conversation is long. Open a reply to see more of it.
             </p>
           )}
+          <div className="sticky bottom-0 z-20 mt-4 bg-linear-to-t from-background from-70% to-transparent pt-4 pb-1">
+            <PostComposer
+              feed={feed}
+              placeholder="Write a reply…"
+              dropUp
+            />
+          </div>
         </>
       ) : (
         <>

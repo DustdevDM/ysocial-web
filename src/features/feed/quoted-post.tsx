@@ -87,7 +87,11 @@ export function QuotedPostCard({
       </Header>
       {post.content && (
         <PostText
-          post={{ id: post.id, content: post.content }}
+          post={{
+            id: post.id,
+            content: post.content,
+            mentions: post.mentions,
+          }}
           previewExternalLinks
           className="mt-1.5 line-clamp-6 text-sm leading-relaxed break-words whitespace-pre-wrap"
         />

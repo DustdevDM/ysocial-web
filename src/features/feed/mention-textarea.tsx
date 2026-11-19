@@ -6,7 +6,10 @@ import {
   useState,
   type ComponentProps,
 } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { DraftHighlight } from "./draft-highlight";
 import { api } from "@/lib/api";
 import {
   findEmojis,
@@ -47,17 +50,25 @@ export function MentionTextarea({
   onBlur,
   onFocus,
   onClick,
+  onScroll,
   ref,
   emojis = "render",
+  topics = false,
+  dropUp = false,
   wrapperClassName = "relative",
+  className,
+  style,
   ...props
 }: Omit<ComponentProps<typeof Textarea>, "value"> & {
   value: string;
   onValueChange: (value: string) => void;
   emojis?: "render" | "plain";
+  topics?: boolean;
+  dropUp?: boolean;
   wrapperClassName?: string;
 }) {
   const input = useRef<HTMLTextAreaElement | null>(null);
+  const overlay = useRef<HTMLDivElement | null>(null);
   const listId = useId();
   const [caret, setCaret] = useState(0);
   const [focused, setFocused] = useState(false);
@@ -95,6 +106,11 @@ export function MentionTextarea({
   const open = users.length ? "users" : emojiList.length ? "emojis" : null;
   const count = open === "users" ? users.length : emojiList.length;
   const current = open === "users" ? selected : emojiSelected;
+
+  useEffect(() => {
+    if (overlay.current && input.current)
+      overlay.current.scrollTop = input.current.scrollTop;
+  }, [value]);
 
   useEffect(() => {
     if (!open) return;
@@ -199,6 +215,13 @@ export function MentionTextarea({
       <Textarea
         {...props}
         value={value}
+        style={style}
+        className={cn(className, "text-transparent caret-foreground")}
+        onScroll={(event) => {
+          if (overlay.current)
+            overlay.current.scrollTop = event.currentTarget.scrollTop;
+          onScroll?.(event);
+        }}
         ref={(element) => {
           input.current = element;
           if (typeof ref === "function") return ref(element);
@@ -303,12 +326,24 @@ export function MentionTextarea({
           onKeyDown?.(event);
         }}
       />
+      <div
+        ref={overlay}
+        aria-hidden="true"
+        style={{ overflowY: style?.overflowY ?? "auto" }}
+        className={cn(
+          "pointer-events-none absolute inset-0 z-[1] border px-3 py-2 text-base break-words whitespace-pre-wrap md:text-sm",
+          className,
+          "block resize-none border-transparent bg-transparent text-foreground shadow-none ring-0 dark:bg-transparent",
+        )}
+      >
+        <DraftHighlight text={value} topics={topics} />
+      </div>
       {users.length > 0 && (
         <div
           id={listId}
           role="listbox"
           aria-label="Username suggestions"
-          className="absolute inset-x-0 top-full z-50 mt-2 max-h-56 overflow-y-auto overscroll-contain rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg"
+          className={`absolute inset-x-0 z-50 max-h-56 overflow-y-auto overscroll-contain rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg ${dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5"}`}
         >
           {users.map((user, index) => (
             <div
@@ -316,19 +351,37 @@ export function MentionTextarea({
               id={`${listId}-${index}`}
               role="option"
               aria-selected={selected === index}
-              className={`cursor-pointer rounded-lg px-3 py-2 text-sm ${selected === index ? "bg-accent text-accent-foreground" : ""}`}
+              className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm ${selected === index ? "bg-accent text-accent-foreground" : ""}`}
               onPointerDown={(event) => {
                 event.preventDefault();
                 choose(user);
               }}
               onPointerMove={() => setActive(index)}
             >
-              <span className="block font-medium">@{user.handle}</span>
-              {user.displayName && (
-                <span className="block truncate text-xs text-muted-foreground">
-                  {user.displayName}
+              <Avatar className="size-6" aria-hidden="true">
+                {user.avatarUrl && (
+                  <AvatarImage
+                    src={user.avatarUrl}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <AvatarFallback className="text-[0.6rem]">
+                  {(user.displayName || user.handle).slice(0, 2)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="flex min-w-0 items-baseline gap-1.5">
+                {user.displayName && (
+                  <span className="truncate font-medium">
+                    {user.displayName}
+                  </span>
+                )}
+                <span
+                  className={`shrink-0 ${user.displayName ? "text-xs text-muted-foreground" : "font-medium"}`}
+                >
+                  @{user.handle}
                 </span>
-              )}
+              </span>
             </div>
           ))}
         </div>
@@ -338,7 +391,7 @@ export function MentionTextarea({
           id={listId}
           role="listbox"
           aria-label="Emoji suggestions"
-          className="absolute inset-x-0 top-full z-50 mt-2 max-h-48 overflow-y-auto overscroll-contain rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg"
+          className={`absolute inset-x-0 z-50 max-h-48 overflow-y-auto overscroll-contain rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg ${dropUp ? "bottom-full mb-1.5" : "top-full mt-2"}`}
         >
           {emojiList.map((item, position) => (
             <div

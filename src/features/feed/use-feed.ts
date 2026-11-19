@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   api,
   errorMessage,
@@ -69,6 +75,10 @@ export function useFeed(
   );
   const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState("");
+  const [unread, setUnread] = useState(0);
+  const pendingPage = useRef<Awaited<ReturnType<typeof api.posts>> | null>(
+    null,
+  );
   useSyncExternalStore(subscribeToActions, getActionRevision);
   const localPosts = useSyncExternalStore(subscribeToLocalPosts, getLocalPosts);
   const visibleLocalPosts = localPosts.filter(
@@ -194,10 +204,14 @@ export function useFeed(
             }));
             if (atTop)
               setEnteringIds((current) => new Set([...current, ...freshIds]));
+            else setUnread((current) => current + fresh.length);
           } else if (atTop) {
             setFeedPosts(page.posts);
             setRepostedBy(page.repostedBy);
             setNextCursor(page.nextCursor);
+          } else {
+            pendingPage.current = page;
+            setUnread((current) => Math.max(current, fresh.length));
           }
           acknowledgePosts(page.posts);
         },
@@ -205,6 +219,16 @@ export function useFeed(
       );
     },
   });
+  function revealNew() {
+    const page = pendingPage.current;
+    pendingPage.current = null;
+    if (page) {
+      setFeedPosts(page.posts);
+      setRepostedBy(page.repostedBy);
+      setNextCursor(page.nextCursor);
+    }
+    setUnread(0);
+  }
   function publishPost(
     text: string = draft,
     gif: GifSearchItem | null = null,
@@ -330,7 +354,13 @@ export function useFeed(
     canPost,
     pending: optimisticPostIds,
     sharePost,
-    refresh: () => load(),
+    unread,
+    revealNew,
+    refresh: () => {
+      pendingPage.current = null;
+      setUnread(0);
+      return load();
+    },
     loadMore: nextCursor
       ? () => {
           setLoading(true);

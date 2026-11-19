@@ -83,10 +83,12 @@ export const topicOptionId = (listId: string, index: number) =>
 export function TopicSuggestionList({
   id,
   suggestions,
+  dropUp = false,
   onPick,
 }: {
   id: string;
   suggestions: TopicSuggestions;
+  dropUp?: boolean;
   onPick: (name: string) => void;
 }) {
   if (!suggestions.open) return null;
@@ -95,7 +97,7 @@ export function TopicSuggestionList({
       id={id}
       role="listbox"
       aria-label="Topic suggestions"
-      className="absolute inset-x-0 top-full z-20 mt-1.5 overflow-hidden rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 slide-in-from-top-1 duration-150"
+      className={`absolute inset-x-0 z-20 overflow-hidden rounded-2xl border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 duration-150 ${dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5 slide-in-from-top-1"}`}
     >
       {suggestions.items.map((topic, index) => (
         <li

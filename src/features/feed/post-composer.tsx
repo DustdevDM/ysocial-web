@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ArrowUp, ChartNoAxesColumn, Plus, X } from "lucide-react";
+import { ComingSoonDialog } from "@/components/coming-soon-dialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,7 +25,6 @@ import {
 import { QuotedPostCard } from "./quoted-post";
 import { quoteOf } from "./quote";
 import { VoiceRecorder } from "./voice-recorder";
-import { splitWrittenTopics } from "@/lib/topics";
 import { renderShortcodes } from "@/lib/emoji";
 import { useEmojiIndex } from "@/lib/use-emoji-index";
 import {
@@ -47,12 +47,15 @@ export function PostComposer({
   feed,
   placeholder = "What's on your mind?",
   topics = true,
+  dropUp = false,
   ...quoting
 }: {
   feed: FeedState;
   placeholder?: string;
   /** Offer #topic completion. */
   topics?: boolean;
+  /** Open suggestion lists above the field (for composers pinned to the bottom). */
+  dropUp?: boolean;
 } & QuoteOptions) {
   if (!feed.sessionLoading && !feed.authenticated) {
     return (
@@ -79,6 +82,7 @@ export function PostComposer({
       feed={feed}
       placeholder={placeholder}
       topics={topics}
+      dropUp={dropUp}
       {...quoting}
     />
   );
@@ -146,6 +150,7 @@ function AuthenticatedPostComposer({
   feed,
   placeholder,
   topics,
+  dropUp,
   quote,
   autoFocus,
   onSubmitted,
@@ -154,9 +159,11 @@ function AuthenticatedPostComposer({
   feed: FeedState;
   placeholder: string;
   topics: boolean;
+  dropUp: boolean;
 } & QuoteOptions) {
   const [published, setPublished] = useState(false);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [soonOpen, setSoonOpen] = useState(false);
   const [gif, setGif] = useState<GifSearchItem | null>(null);
   const [poll, setPoll] = useState<PollDraft | null>(null);
   const [voice, setVoice] = useState<VoiceDraft>();
@@ -167,7 +174,6 @@ function AuthenticatedPostComposer({
   const [height, setHeight] = useState<number>();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const mirror = useRef<HTMLDivElement>(null);
-  const highlight = useRef<HTMLDivElement>(null);
   const scrolls = (height ?? 0) > MAX_HEIGHT;
   const helpId = useId();
   const suggestionsId = useId();
@@ -249,6 +255,7 @@ function AuthenticatedPostComposer({
 
   const textClass = "py-1.5 text-sm leading-6 md:text-base";
   return (
+    <>
     <Dialog open={gifPickerOpen} onOpenChange={setGifPickerOpen}>
       {/* Equal 8px padding above, below and right of the buttons (36px). */}
       <div className="relative mx-auto w-full max-w-xl">
@@ -284,7 +291,7 @@ function AuthenticatedPostComposer({
             </div>
           )}
           <div
-            className="relative min-w-0 flex-1 transition-[height] duration-200 ease-out"
+            className="relative min-w-0 flex-1 basis-[calc(100%-0.5rem)] transition-[height] duration-200 ease-out"
             style={{
               height: height ? Math.min(height, MAX_HEIGHT) : undefined,
             }}
@@ -297,30 +304,6 @@ function AuthenticatedPostComposer({
               {draft || " "}
               {"\u200b"}
             </div>
-            {topics && (
-              // Draws the text under the see-through textarea, so written
-              // #topics can be blue. Same box, font and scroll as the field.
-              <div
-                ref={highlight}
-                aria-hidden="true"
-                style={{ overflowY: scrolls ? "auto" : "hidden" }}
-                className={`pointer-events-none absolute inset-0 break-words whitespace-pre-wrap ${textClass}`}
-              >
-                {splitWrittenTopics(draft).map((part, index) =>
-                  part.topic ? (
-                    <span
-                      key={index}
-                      className="text-blue-600 dark:text-blue-400"
-                    >
-                      {part.text}
-                    </span>
-                  ) : (
-                    part.text
-                  ),
-                )}
-                {"\u200b"}
-              </div>
-            )}
             <MentionTextarea
               ref={textarea}
               aria-label={placeholder.replace("…", "")}
@@ -335,6 +318,8 @@ function AuthenticatedPostComposer({
               rows={1}
               value={draft}
               onValueChange={setDraft}
+              topics={topics}
+              dropUp={dropUp}
               wrapperClassName="relative h-full"
               disabled={!feed.canPost}
               onChange={(event) => {
@@ -345,10 +330,6 @@ function AuthenticatedPostComposer({
               onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              onScroll={(event) => {
-                if (highlight.current)
-                  highlight.current.scrollTop = event.currentTarget.scrollTop;
-              }}
               onKeyDown={(event) => {
                 if (suggestions.open && !event.nativeEvent.isComposing) {
                   const chosen =
@@ -389,7 +370,7 @@ function AuthenticatedPostComposer({
                 }
               }}
               style={{ overflowY: scrolls ? "auto" : "hidden" }}
-              className={`${topics ? "text-transparent caret-foreground " : ""}absolute inset-0 h-full min-h-0 resize-none field-sizing-fixed rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 dark:bg-transparent dark:disabled:bg-transparent ${textClass}`}
+              className={`absolute inset-0 h-full min-h-0 resize-none field-sizing-fixed rounded-none border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 dark:bg-transparent dark:disabled:bg-transparent ${textClass}`}
             />
           </div>
           {poll && (
@@ -410,8 +391,15 @@ function AuthenticatedPostComposer({
             onChange={setVoice}
             onBusyChange={setVoiceBusy}
             renderToolbar={(recordButton) => (
-              <div className="ml-auto flex shrink-0 items-center gap-1">
-                <LimitRing length={length} />
+              <div className="-ml-2 flex shrink-0 basis-[calc(100%+0.5rem)] items-center gap-0.5">
+                <IconButton
+                  label="Upload"
+                  type="button"
+                  className="rounded-full text-muted-foreground"
+                  onClick={() => setSoonOpen(true)}
+                >
+                  <Plus aria-hidden="true" />
+                </IconButton>
                 {!poll && (
                   <IconButton
                     label="Add poll"
@@ -442,15 +430,18 @@ function AuthenticatedPostComposer({
                 >
                   <span className="text-[10px] font-semibold">GIF</span>
                 </DialogTrigger>
-                <IconButton
-                  label={quote ? "Publish quote" : "Publish post"}
-                  type="submit"
-                  variant="default"
-                  className="rounded-full"
-                  disabled={!valid}
-                >
-                  <ArrowUp />
-                </IconButton>
+                <div className="ml-auto flex items-center gap-1">
+                  <LimitRing length={length} />
+                  <IconButton
+                    label={quote ? "Publish quote" : "Publish post"}
+                    type="submit"
+                    variant="default"
+                    className="rounded-full"
+                    disabled={!valid}
+                  >
+                    <ArrowUp />
+                  </IconButton>
+                </div>
               </div>
             )}
           />
@@ -471,6 +462,7 @@ function AuthenticatedPostComposer({
         <TopicSuggestionList
           id={suggestionsId}
           suggestions={suggestions}
+          dropUp={dropUp}
           onPick={pickTopic}
         />
         <p role="status" className="sr-only">
@@ -488,6 +480,8 @@ function AuthenticatedPostComposer({
         />
       )}
     </Dialog>
+    <ComingSoonDialog open={soonOpen} onOpenChange={setSoonOpen} />
+    </>
   );
 }
 

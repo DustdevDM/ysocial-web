@@ -1,5 +1,5 @@
 import type { MouseEventHandler } from "react";
-import { House, Search, UserRound } from "lucide-react";
+import { House, Plus, Search, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { LegalMenu } from "./legal-menu";
 import { ProgressiveBlur } from "@/components/ui/progressive-blur";
@@ -8,6 +8,7 @@ import type { AuthState } from "@/features/auth/use-auth";
 import { NotificationsBell } from "@/features/notifications/notifications";
 import { FloatingNavigation } from "@/components/ui/floating-navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useNewPostTarget } from "@/features/feed/new-post-target";
 
 export function MobileHeader({
   auth,
@@ -57,6 +58,7 @@ export function MobileHeader({
 
 export function MobileNavigation({ auth }: { auth: AuthState }) {
   const { pathname } = useLocation();
+  const newPost = useNewPostTarget();
   const session = auth.session;
   const user =
     session?.authenticated && !session.needsOnboarding ? session.user : null;
@@ -92,12 +94,24 @@ export function MobileNavigation({ auth }: { auth: AuthState }) {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-[max(1rem,env(safe-area-inset-left),env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden">
-      <FloatingNavigation
-        items={items}
-        activeTo={activeTo}
-        label="Mobile navigation"
-        className="pointer-events-auto mx-auto w-full max-w-64"
-      />
+      <div className="flex items-center justify-center gap-2">
+        <FloatingNavigation
+          items={items}
+          activeTo={activeTo}
+          label="Mobile navigation"
+          className="pointer-events-auto w-full max-w-64"
+        />
+        {newPost && (
+          <button
+            type="button"
+            aria-label="Write a new post"
+            onClick={newPost.open}
+            className="pointer-events-auto flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_32px_-8px_rgb(0_0_0/0.5)] ring-1 ring-white/15 outline-none animate-in fade-in-0 zoom-in-75 duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-white/90 motion-reduce:animate-none"
+          >
+            <Plus className="size-6" aria-hidden="true" strokeWidth={2.5} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

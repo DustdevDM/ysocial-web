@@ -1,5 +1,8 @@
 import type { MouseEventHandler } from "react";
+import { Plus } from "lucide-react";
 import { Link, NavLink } from "react-router";
+import { Button } from "@/components/ui/button";
+import { useNewPostTarget } from "@/features/feed/new-post-target";
 import {
   Tooltip,
   TooltipContent,
@@ -20,6 +23,7 @@ export function NavigationSidebar({
   auth?: AuthState;
   onLogoClick: MouseEventHandler<HTMLAnchorElement>;
 }) {
+  const newPost = useNewPostTarget();
   return (
     <aside
       aria-label="Sidebar"
@@ -102,6 +106,17 @@ export function NavigationSidebar({
             </Tooltip>
           ))}
         </nav>
+        {newPost && (
+          <Button
+            type="button"
+            onClick={newPost.open}
+            aria-label="Write a new post"
+            className="h-11 w-full rounded-full text-base animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none"
+          >
+            <Plus className="size-5" aria-hidden="true" strokeWidth={2.5} />
+            <span className="hidden lg:inline">Post</span>
+          </Button>
+        )}
       </div>
       {showAccount && auth && (
         // Pages without the right-hand column keep the account controls here:
