@@ -17,7 +17,8 @@ import {
   useNavigationType,
   useParams,
 } from "react-router";
-import { ArrowLeft, Construction, SearchX } from "lucide-react";
+import { ArrowLeft, SearchX } from "lucide-react";
+import { ComingSoonContent } from "@/components/coming-soon-content";
 import { NavigationSidebar } from "@/components/layout/navigation-sidebar";
 import { AccountSidebar } from "@/components/layout/account-sidebar";
 import {
@@ -340,13 +341,7 @@ function ComingSoon({ title }: { title: string }) {
       <IconLink to="/" label="Back" onClick={goBack}>
         <ArrowLeft />
       </IconLink>
-      <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <Construction className="size-9 text-muted-foreground" />
-        <h1 className="text-xl font-semibold">{title}</h1>
-        <p className="text-sm text-muted-foreground">
-          This part of ysocial is on its way.
-        </p>
-      </div>
+      <ComingSoonContent title={title} heading="h1" />
     </div>
   );
 }

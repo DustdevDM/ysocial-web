@@ -44,6 +44,7 @@ import { BannerEditor } from "./banner-editor";
 import { AvatarCropper } from "./avatar-cropper";
 import { RecentAvatars } from "./recent-avatars";
 import { ProfileForm } from "./profile-form";
+import { ProfileEditDialogContent } from "./profile-edit-dialog";
 import { PostCard } from "@/features/feed/post-card";
 import { useFeed } from "@/features/feed/use-feed";
 import { ProfileSkeleton } from "@/components/loading-skeletons";
@@ -461,16 +462,7 @@ export function ProfilePage({
                   <Pencil aria-hidden="true" />
                   Edit
                 </DialogTrigger>
-                <DialogContent
-                  className="max-h-[90dvh] overflow-y-auto p-6 sm:max-w-lg"
-                  showCloseButton={!savingProfile}
-                >
-                  <DialogHeader>
-                    <DialogTitle>Edit profile</DialogTitle>
-                    <DialogDescription>
-                      Update your name, handle, pronouns, and bio.
-                    </DialogDescription>
-                  </DialogHeader>
+                <ProfileEditDialogContent saving={savingProfile}>
                   {editDialogOpen && (
                     <ProfileForm
                       appearance="dialog"
@@ -494,7 +486,7 @@ export function ProfilePage({
                       }}
                     />
                   )}
-                </DialogContent>
+                </ProfileEditDialogContent>
               </Dialog>
             )}
             {session && !feed.readOnly &&
